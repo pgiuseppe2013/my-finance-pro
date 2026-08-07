@@ -74,11 +74,12 @@ dizionario = {
         "appTitle": "MY FINANCE PRO",
         "dash": "Dashboard",
         "list": "Movimenti",
+        "report": "Report & Cash Flow",
         "settings": "Impostazioni",
         "realBalance": "SALDO LIQUIDO REALE (CONTI)",
         "loansBalance": "TOTALE DEBITI / FINANZIAMENTI",
         "yourAccounts": "I TUOI CONTI E CARTE",
-        "addAccount": "Aggiungi Conto",
+        "addAccount": "Aggiungi Nuovo Conto",
         "newMov": "Nuovo Movimento",
         "selectAccount": "Seleziona Conto",
         "category": "Categoria (Obbligatoria)",
@@ -95,16 +96,18 @@ dizionario = {
         "accountName": "Nome Conto",
         "initialBalance": "Saldo Iniziale",
         "isLoan": "Finanziamento / Carta Credito (Plafond)",
+        "deleteAccount": "Elimina Conto",
     },
     "en": {
         "appTitle": "MY FINANCE PRO",
         "dash": "Dashboard",
         "list": "Transactions",
+        "report": "Report & Cash Flow",
         "settings": "Settings",
         "realBalance": "NET LIQUID BALANCE (ACCOUNTS)",
         "loansBalance": "TOTAL LIABILITIES / CARDS",
         "yourAccounts": "YOUR ACCOUNTS & CARDS",
-        "addAccount": "Add Account",
+        "addAccount": "Add New Account",
         "newMov": "New Transaction",
         "selectAccount": "Select Account",
         "category": "Category (Required)",
@@ -121,6 +124,7 @@ dizionario = {
         "accountName": "Account Name",
         "initialBalance": "Initial Balance",
         "isLoan": "Loan / Credit Card (Plafond)",
+        "deleteAccount": "Delete Account",
     },
 }
 
@@ -146,14 +150,13 @@ def converti(importo, orig, dest):
 # --- BARRA LATERALE (MENU) ---
 st.sidebar.title(t("appTitle"))
 menu = st.sidebar.radio(
-    "Navigazione", [t("dash"), t("list"), t("settings")]
+    "Navigazione", [t("dash"), t("list"), t("report"), t("settings")]
 )
 
 # --- SEZIONE: DASHBOARD ---
 if menu == t("dash"):
     st.title(t("appTitle"))
 
-    # Calcolo Saldi
     valuta_vis = st.session_state.valuta
     simbolo = simboliValuta.get(valuta_vis, "€")
 
@@ -207,12 +210,16 @@ elif menu == t("list"):
             "Tipo", [t("expenses"), t("incomes")], horizontal=True
         )
 
-        conti_nomi = {c["id"]: c["nome"] for c in st.session_state.conti}
-        conto_sel_id = st.selectbox(
-            t("selectAccount"),
-            options=list(conti_nomi.keys()),
-            format_func=lambda x: conti_nomi[x],
-        )
+        if not st.session_state.conti:
+            st.warning("Crea prima un conto nella sezione Impostazioni.")
+            conto_sel_id = None
+        else:
+            conti_nomi = {c["id"]: c["nome"] for c in st.session_state.conti}
+            conto_sel_id = st.selectbox(
+                t("selectAccount"),
+                options=list(conti_nomi.keys()),
+                format_func=lambda x: conti_nomi[x],
+            )
 
         cat_lista = (
             st.session_state.categorie_entrata
@@ -225,7 +232,7 @@ elif menu == t("list"):
         importo = st.number_input(t("amount"), min_value=0.0, step=0.01)
 
         submitted = st.form_submit_button(t("save"))
-        if submitted:
+        if submitted and conto_sel_id:
             valore_finale = -abs(importo) if tipo_form == t("expenses") else abs(importo)
             nuovo_mov = {
                 "id": str(datetime.datetime.now().timestamp()),
@@ -243,20 +250,62 @@ elif menu == t("list"):
     if not st.session_state.movimenti:
         st.info("Nessun movimento trovato.")
     else:
-        for m in reversed(st.session_state.movimenti):
+        for idx, m in enumerate(reversed(st.session_state.movimenti)):
             c_nome = next(
                 (c["nome"] for c in st.session_state.conti if c["id"] == m["contoId"]),
                 "Conto",
             )
-            st.write(
-                f"📅 {m['data']} | **{c_nome}** | {m['categoria']} - {m['t']} | "
-                f"**{m['v']:,.2f}**"
-            )
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.write(
+                    f"📅 {m['data']} | **{c_nome}** | {m['categoria']} - {m['t']} | "
+                    f"**{m['v']:,.2f}**"
+                )
+            with col_b:
+                if st.button("🗑️", key=f"del_mov_{m['id']}"):
+                    st.session_state.movimenti = [
+                        item for item in st.session_state.movimenti if item["id"] != m["id"]
+                    ]
+                    st.rerun()
 
-# --- SEZIONE: IMPOSTAZIONI ---
+# --- SEZIONE: REPORT & CASH FLOW ---
+elif menu == t("report"):
+    st.subheader(t("report"))
+
+    if not st.session_state.movimenti:
+        st.info("Nessun movimento registrato per generare i report.")
+    else:
+        tot_entrate = sum(m["v"] for m in st.session_state.movimenti if m["v"] > 0)
+        tot_uscite = sum(abs(m["v"]) for m in st.session_state.movimenti if m["v"] < 0)
+        cash_flow_netto = tot_entrate - tot_uscite
+
+        valuta_vis = st.session_state.valuta
+        simbolo = simboliValuta.get(valuta_vis, "€")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Totale Entrate", f"{tot_entrate:,.2f} {simbolo}")
+        col2.metric("Totale Uscite", f"{tot_uscite:,.2f} {simbolo}")
+        col3.metric("Cash Flow Netto", f"{cash_flow_netto:,.2f} {simbolo}")
+
+        st.divider()
+        st.subheader("Uscite per Categoria")
+        spese_per_cat = {}
+        for m in st.session_state.movimenti:
+            if m["v"] < 0:
+                cat = m["categoria"]
+                spese_per_cat[cat] = spese_per_cat.get(cat, 0.0) + abs(m["v"])
+
+        if spese_per_cat:
+            for cat, importo in sorted(spese_per_cat.items(), key=lambda x: x[1], reverse=True):
+                st.write(f"- **{cat}**: {importo:,.2f} {simbolo}")
+        else:
+            st.write("Nessuna spesa registrata.")
+
+# --- SEZIONE: IMPOSTAZIONI & GESTIONE CONTI ---
 elif menu == t("settings"):
     st.subheader(t("settings"))
 
+    # Config lingua e valuta
     lingua_scelta = st.selectbox(
         t("lang"),
         options=["it", "en"],
@@ -273,3 +322,43 @@ elif menu == t("settings"):
         st.session_state.valuta = valuta_scelta
         st.success(t("settingsSaved"))
         st.rerun()
+
+    st.divider()
+    st.subheader("Gestione Conti e Carte")
+
+    # Form per aggiungere un nuovo conto
+    with st.form("nuovo_conto_form"):
+        st.write(t("addAccount"))
+        nome_nuovo_conto = st.text_input(t("accountName"))
+        saldo_iniziale_nuovo = st.number_input(t("initialBalance"), value=0.0, step=0.01)
+        valuta_nuovo_conto = st.selectbox("Valuta Conto", options=list(tassiDiCambio.keys()))
+        is_finanziamento_nuovo = st.checkbox(t("isLoan"))
+
+        aggiungi_conto_sub = st.form_submit_button("Crea Conto")
+        if aggiungi_conto_sub and nome_nuovo_conto:
+            nuovo_id = "c_" + str(datetime.datetime.now().timestamp())
+            st.session_state.conti.append({
+                "id": nuovo_id,
+                "nome": nome_nuovo_conto,
+                "saldoIniziale": saldo_iniziale_nuovo,
+                "valuta": valuta_nuovo_conto,
+                "isFinanziamento": is_finanziamento_nuovo
+            })
+            st.success(f"Conto '{nome_nuovo_conto}' aggiunto con successo!")
+            st.rerun()
+
+    st.write("### Conti Esistenti (Elimina)")
+    for c in st.session_state.conti:
+        col_c1, col_c2 = st.columns([3, 1])
+        with col_c1:
+            st.write(f"💳 **{c['nome']}** ({c['valuta']})")
+        with col_c2:
+            if st.button(t("delete"), key=f"del_conto_{c['id']}"):
+                if len(st.session_state.conti) <= 1:
+                    st.error("Non puoi eliminare l'ultimo conto rimasto!")
+                else:
+                    # Rimuove il conto e i movimenti associati
+                    st.session_state.conti = [item for item in st.session_state.conti if item["id"] != c["id"]]
+                    st.session_state.movimenti = [m for m in st.session_state.movimenti if m["contoId"] != c["id"]]
+                    st.success("Conto eliminato.")
+                    st.rerun()
