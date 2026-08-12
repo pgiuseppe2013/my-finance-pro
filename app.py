@@ -39,7 +39,6 @@ if 'settings' not in st.session_state:
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "DASHBOARD"
 
-# Inizializzazione categorie personalizzabili nello state
 if 'cats_in' not in st.session_state:
     st.session_state.cats_in = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
 if 'cats_out' not in st.session_state:
@@ -86,7 +85,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
         "desc": desc, "amt": amt, "virtual": False
     })
 
-# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE UNIDIREZIONALE DATE E CATEGORIE DINAMICHE
+# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE UNIDIREZIONALE
 def render_movement_form(key_suffix=""):
     with st.expander("➕ Aggiungi Nuovo Movimento"):
         if not st.session_state.accounts:
@@ -132,7 +131,7 @@ def render_movement_form(key_suffix=""):
         if st.button("REGISTRA MOVIMENTO", key=f"btn_save_mov_{key_suffix}"):
             a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
             add_movement(dc, dv, a_id, m_type, cat, desc, amt)
-            st.success("✅ Movimento registrato con successo!")
+            st.success("✅ Movimento inserito con successo!")
             st.rerun()
 
 # 6. BARRA DI NAVIGAZIONE A PULSANTI
@@ -216,7 +215,7 @@ if menu == "DASHBOARD":
                     "plafond": plafond, "addebito_day": addebito,
                     "scadenza": scadenza.strftime("%d/%m/%Y") if t == "Carta di Credito" else ""
                 })
-                st.success("✅ Conto creato con successo!")
+                st.success("✅ Conto o carta inserito con successo!")
                 st.rerun()
 
 # --- MOVIMENTI ---
@@ -293,23 +292,19 @@ elif menu == "REPORT":
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
-    st.subheader("Configurazioni App")
-    render_movement_form(key_suffix="set_tab")
-
-    st.divider()
+    st.subheader("⚙️ Configurazioni App")
     
-    st.markdown("### ⚙️ Gestione Categorie Movimenti")
-    col_c1, col_c2 = st.columns(2)
-    
-    # Gestione Categorie Entrate
-    with col_c1:
-        with st.container(border=True):
-            st.markdown("#### 📥 Categorie Entrate")
+    # Nascondiamo la gestione categorie sotto un expander pulito
+    with st.expander("📁 Gestisci Classificazione Categorie"):
+        col_c1, col_c2 = st.columns(2)
+        
+        with col_c1:
+            st.markdown("#### 📥 Entrate")
             new_cat_in = st.text_input("Nuova categoria entrata", key="input_new_cat_in")
             if st.button("Aggiungi Entrata", key="btn_add_cat_in"):
                 if new_cat_in.strip() and new_cat_in not in st.session_state.cats_in:
                     st.session_state.cats_in.append(new_cat_in.strip())
-                    st.success(f"Categoria '{new_cat_in}' aggiunta!")
+                    st.success(f"✅ Categoria '{new_cat_in}' aggiunta!")
                     st.rerun()
                 elif not new_cat_in.strip():
                     st.warning("Inserisci un nome valido.")
@@ -325,17 +320,15 @@ elif menu == "IMPOSTAZIONI":
                         st.session_state.cats_in.remove(cat)
                         st.rerun()
                     else:
-                        st.error("Devi mantenere almeno una categoria.")
+                        st.error("Minimo 1 categoria richiesta.")
 
-    # Gestione Categorie Uscite
-    with col_c2:
-        with st.container(border=True):
-            st.markdown("#### 📤 Categorie Uscite")
+        with col_c2:
+            st.markdown("#### 📤 Uscite")
             new_cat_out = st.text_input("Nuova categoria uscita", key="input_new_cat_out")
             if st.button("Aggiungi Uscita", key="btn_add_cat_out"):
                 if new_cat_out.strip() and new_cat_out not in st.session_state.cats_out:
                     st.session_state.cats_out.append(new_cat_out.strip())
-                    st.success(f"Categoria '{new_cat_out}' aggiunta!")
+                    st.success(f"✅ Categoria '{new_cat_out}' aggiunta!")
                     st.rerun()
                 elif not new_cat_out.strip():
                     st.warning("Inserisci un nome valido.")
@@ -351,12 +344,12 @@ elif menu == "IMPOSTAZIONI":
                         st.session_state.cats_out.remove(cat)
                         st.rerun()
                     else:
-                        st.error("Devi mantenere almeno una categoria.")
+                        st.error("Minimo 1 categoria richiesta.")
 
-    st.divider()
-    st.markdown("### 🌐 Preferenze Generali")
-    st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS, index=LANGS.index(st.session_state.settings['lang']))
-    st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS, index=CURRS.index(st.session_state.settings['currency']))
-    if st.button("SALVA IMPOSTAZIONI", key="btn_save_set"):
-        st.success("✅ Impostazioni salvate!")
-        st.rerun()
+    # Nascondiamo le preferenze generali sotto un altro expander pulito
+    with st.expander("🌐 Preferenze Lingua e Valuta"):
+        st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS, index=LANGS.index(st.session_state.settings['lang']))
+        st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS, index=CURRS.index(st.session_state.settings['currency']))
+        if st.button("SALVA IMPOSTAZIONI", key="btn_save_set"):
+            st.success("✅ Impostazioni salvate con successo!")
+            st.rerun()
