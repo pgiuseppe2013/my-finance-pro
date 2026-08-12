@@ -44,10 +44,203 @@ if 'cats_in' not in st.session_state:
 if 'cats_out' not in st.session_state:
     st.session_state.cats_out = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
+# 3. DIZIONARIO TRADUZIONI MULTILINGUA COMPLETO
+TRANSLATIONS = {
+    "IT": {
+        "title": "⚡ MY FINANCE PRO",
+        "dash": "📊 DASHBOARD",
+        "mov": "📝 MOVIMENTI",
+        "rep": "📈 REPORT & CASH FLOW",
+        "set": "⚙️ IMPOSTAZIONI",
+        "tot_liq": "LIQUIDITÀ TOTALE",
+        "panoramica": "Panoramica Patrimoniale e Conti",
+        "add_acc": "➕ Aggiungi Nuovo Conto o Carta",
+        "type_acc": "Tipo di Rapporto",
+        "name_acc": "Nome Conto / Carta",
+        "init_bal": "Saldo di Partenza",
+        "init_date": "A che data hai questo saldo?",
+        "plafond": "Plafond Mensile",
+        "scad_carta": "Data Scadenza Carta",
+        "giorno_add": "Giorno Addebito",
+        "btn_create_acc": "CREA CONTO / CARTA",
+        "succ_acc": "✅ Conto o carta inserito con successo!",
+        "add_mov": "➕ Aggiungi Nuovo Movimento",
+        "data_cont": "Data Contabile",
+        "data_val": "Data Valuta",
+        "sel_acc": "Seleziona Conto / Carta",
+        "op_type": "Tipo Operazione",
+        "entrata": "Entrata",
+        "uscita": "Uscita",
+        "cat": "Categoria",
+        "importo": "Importo",
+        "desc": "Descrizione (Opzionale)",
+        "repeat": "Ripeti movimento nel tempo",
+        "freq": "Frequenza",
+        "mensile": "Mensile",
+        "annuale": "Annuale",
+        "num_rip": "Numero di ripetizioni",
+        "btn_reg_mov": "REGISTRA MOVIMENTO",
+        "succ_mov": "✅ Movimento inserito con successo!",
+        "search_mov": "🔍 Cerca nei movimenti...",
+        "gest_mov": "Gestione Movimenti",
+        "analisi_cf": "Analisi Cash Flow e Dettagli",
+        "sel_periodo": "Seleziona Periodo Analisi (Passato & Futuro)",
+        "tot_entrate": "Totale Entrate",
+        "tot_uscite": "Totale Uscite",
+        "flusso_netto": "Flusso Netto Periodo",
+        "trend_cf": "Trend Cash Flow Patrimoniale (Incluso Saldo Iniziale)",
+        "dett_cat": "🔍 Dettaglio Movimenti per Categoria",
+        "vista_dett": "Fissa vista dettaglio:",
+        "tutti": "Tutti",
+        "solo_ent": "Solo Entrate",
+        "solo_usc": "Solo Uscite",
+        "config_app": "⚙️ Configurazioni App",
+        "gest_cat": "📁 Gestisci Classificazione Categorie",
+        "pref_ling": "🌐 Preferenze Lingua e Valuta",
+        "lingua": "Lingua",
+        "valuta": "Valuta",
+        "btn_salva_set": "SALVA IMPOSTAZIONI",
+        "succ_set": "✅ Impostazioni salvate con successo!",
+        "del_conto": "Elimina Conto",
+        "residuo_plaf": "Residuo Plafond",
+        "scadenza": "Scadenza",
+        "warning_no_acc": "⚠️ Crea prima almeno un Conto o una Carta di Credito dalla Dashboard per poter inserire movimenti.",
+        "err_name_acc": "Inserisci un nome valido per il conto."
+    },
+    "EN": {
+        "title": "⚡ MY FINANCE PRO",
+        "dash": "📊 DASHBOARD",
+        "mov": "📝 TRANSACTIONS",
+        "rep": "📈 REPORT & CASH FLOW",
+        "set": "⚙️ SETTINGS",
+        "tot_liq": "TOTAL LIQUIDITY",
+        "panoramica": "Asset Overview & Accounts",
+        "add_acc": "➕ Add New Account or Card",
+        "type_acc": "Account Type",
+        "name_acc": "Account / Card Name",
+        "init_bal": "Initial Balance",
+        "init_date": "As of what date is this balance?",
+        "plafond": "Monthly Limit",
+        "scad_carta": "Card Expiry Date",
+        "giorno_add": "Charge Day",
+        "btn_create_acc": "CREATE ACCOUNT / CARD",
+        "succ_acc": "✅ Account or card successfully created!",
+        "add_mov": "➕ Add New Transaction",
+        "data_cont": "Accounting Date",
+        "data_val": "Value Date",
+        "sel_acc": "Select Account / Card",
+        "op_type": "Operation Type",
+        "entrata": "Income",
+        "uscita": "Expense",
+        "cat": "Category",
+        "importo": "Amount",
+        "desc": "Description (Optional)",
+        "repeat": "Repeat transaction over time",
+        "freq": "Frequency",
+        "mensile": "Monthly",
+        "annuale": "Yearly",
+        "num_rip": "Number of repetitions",
+        "btn_reg_mov": "REGISTER TRANSACTION",
+        "succ_mov": "✅ Transaction successfully registered!",
+        "search_mov": "🔍 Search transactions...",
+        "gest_mov": "Transactions Management",
+        "analisi_cf": "Cash Flow Analysis & Details",
+        "sel_periodo": "Select Analysis Period (Past & Future)",
+        "tot_entrate": "Total Income",
+        "tot_uscite": "Total Expenses",
+        "flusso_netto": "Net Period Flow",
+        "trend_cf": "Patrimonial Cash Flow Trend (Incl. Initial Balance)",
+        "dett_cat": "🔍 Transaction Details by Category",
+        "vista_dett": "Filter detail view:",
+        "tutti": "All",
+        "solo_ent": "Only Income",
+        "solo_usc": "Only Expenses",
+        "config_app": "⚙️ App Configurations",
+        "gest_cat": "📁 Manage Category Classification",
+        "pref_ling": "🌐 Language & Currency Preferences",
+        "lingua": "Language",
+        "valuta": "Currency",
+        "btn_salva_set": "SAVE SETTINGS",
+        "succ_set": "✅ Settings successfully saved!",
+        "del_conto": "Delete Account",
+        "residuo_plaf": "Remaining Limit",
+        "scadenza": "Expiry",
+        "warning_no_acc": "⚠️ Please create at least one Account or Credit Card from the Dashboard first.",
+        "err_name_acc": "Please enter a valid account name."
+    },
+    "FR": {
+        "title": "⚡ MY FINANCE PRO",
+        "dash": "📊 TABLEAU DE BORD",
+        "mov": "📝 TRANSACTIONS",
+        "rep": "📈 RAPPORT & FLUX DE TRÉSORERIE",
+        "set": "⚙️ PARAMÈTRES",
+        "tot_liq": "LIQUIDITÉ TOTALE",
+        "panoramica": "Aperçu des Actifs & Comptes",
+        "add_acc": "➕ Ajouter un Compte ou une Carte",
+        "type_acc": "Type de Compte",
+        "name_acc": "Nom du Compte / Carte",
+        "init_bal": "Solde Initial",
+        "init_date": "À quelle date avez-vous ce solde ?",
+        "plafond": "Plafond Mensuel",
+        "scad_carta": "Date d'Expiration de la Carte",
+        "giorno_add": "Jour de Prélèvement",
+        "btn_create_acc": "CRÉER COMPTE / CARTE",
+        "succ_acc": "✅ Compte ou carte créé avec succès !",
+        "add_mov": "➕ Ajouter une Transaction",
+        "data_cont": "Date Comptable",
+        "data_val": "Date de Valeur",
+        "sel_acc": "Sélectionner Compte / Carte",
+        "op_type": "Type d'Opération",
+        "entrata": "Revenu",
+        "uscita": "Dépense",
+        "cat": "Catégorie",
+        "importo": "Montant",
+        "desc": "Description (Optionnel)",
+        "repeat": "Répéter la transaction dans le temps",
+        "freq": "Fréquence",
+        "mensile": "Mensuel",
+        "annuale": "Annuel",
+        "num_rip": "Nombre de répétitions",
+        "btn_reg_mov": "ENREGISTRER LA TRANSACTION",
+        "succ_mov": "✅ Transaction enregistrée avec succès !",
+        "search_mov": "🔍 Rechercher des transactions...",
+        "gest_mov": "Gestion des Transactions",
+        "analisi_cf": "Analyse du Flux & Détails",
+        "sel_periodo": "Sélectionner la Période (Passé & Futur)",
+        "tot_entrate": "Total Revenus",
+        "tot_uscite": "Total Dépenses",
+        "flusso_netto": "Flux Net de la Période",
+        "trend_cf": "Tendance du Flux de Trésorerie (Solde Initial Inclus)",
+        "dett_cat": "🔍 Détails par Catégorie",
+        "vista_dett": "Filtrer la vue:",
+        "tutti": "Tous",
+        "solo_ent": "Seulement Revenus",
+        "solo_usc": "Seulement Dépenses",
+        "config_app": "⚙️ Configuration de l'App",
+        "gest_cat": "📁 Gérer les Catégories",
+        "pref_ling": "🌐 Préférences de Langue & Devise",
+        "lingua": "Langue",
+        "valuta": "Devise",
+        "btn_salva_set": "ENREGISTRER LES PARAMÈTRES",
+        "succ_set": "✅ Paramètres enregistrés avec succès !",
+        "del_conto": "Supprimer le Compte",
+        "residuo_plaf": "Plafond Restant",
+        "scadenza": "Expiration",
+        "warning_no_acc": "⚠️ Veuillez d'abord créer un Compte ou une Carte.",
+        "err_name_acc": "Veuillez entrer un nom valide."
+    }
+}
+
+def t(key):
+    lang = st.session_state.settings["lang"]
+    if lang in TRANSLATIONS and key in TRANSLATIONS[lang]:
+        return TRANSLATIONS[lang][key]
+    return TRANSLATIONS["EN"].get(key, key)
+
 LANGS = ["IT", "EN", "FR", "ES", "DE", "PT", "ZH", "JA", "RU", "AR"]
 CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
 
-# 3. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF
+# 4. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF
 def get_account_balance(acc):
     acc_id = acc['id']
     init_bal = acc['init_bal']
@@ -60,36 +253,65 @@ def get_account_balance(acc):
     
     return init_bal + sum(m['amt'] for m in valid_movements)
 
-# 4. FUNZIONE AGGIUNTA MOVIMENTO
-def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
+# 5. FUNZIONE AGGIUNTA MOVIMENTO CON GESTIONE RIPETIZIONI NEL TEMPO
+def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt, repeat=False, freq="Mensile", count=1):
     acc = next((a for a in st.session_state.accounts if a['id'] == acc_id), None)
     
-    if acc and acc['type'] == "Carta di Credito" and amt < 0:
-        try:
-            next_month = m_date_c.replace(day=1) + timedelta(days=32)
-            addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
-        except ValueError:
-            addebito_date = m_date_c + timedelta(days=30)
-            
-        st.session_state.movements.append({
-            "id": f"PREV_{datetime.datetime.now().timestamp()}",
-            "date_c": addebito_date, "date_v": addebito_date,
-            "acc_id": acc_id, "type": "Uscita (Prev)", "cat": "Saldo Carta",
-            "desc": f"Addebito carta: {desc}", "amt": amt, "virtual": True
-        })
+    iterations = count if repeat else 1
     
-    st.session_state.movements.append({
-        "id": str(datetime.datetime.now().timestamp()),
-        "date_c": m_date_c, "date_v": m_date_v,
-        "acc_id": acc_id, "type": m_type, "cat": cat,
-        "desc": desc, "amt": amt, "virtual": False
-    })
+    for i in range(iterations):
+        if i == 0:
+            curr_dc = m_date_c
+            curr_dv = m_date_v
+        else:
+            if freq == "Mensile":
+                # Avanza di i mesi
+                try:
+                    curr_dc = m_date_c.replace(day=1) + timedelta(days=32 * i)
+                    curr_dc = curr_dc.replace(day=m_date_c.day)
+                except ValueError:
+                    curr_dc = m_date_c + timedelta(days=30 * i)
+                try:
+                    curr_dv = m_date_v.replace(day=1) + timedelta(days=32 * i)
+                    curr_dv = curr_dv.replace(day=m_date_v.day)
+                except ValueError:
+                    curr_dv = m_date_v + timedelta(days=30 * i)
+            else: # Annuale
+                try:
+                    curr_dc = m_date_c.replace(year=m_date_c.year + i)
+                except ValueError:
+                    curr_dc = m_date_c + timedelta(days=365 * i)
+                try:
+                    curr_dv = m_date_v.replace(year=m_date_v.year + i)
+                except ValueError:
+                    curr_dv = m_date_v + timedelta(days=365 * i)
 
-# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE UNIDIREZIONALE
+        if acc and acc['type'] == "Carta di Credito" and amt < 0:
+            try:
+                next_month = curr_dc.replace(day=1) + timedelta(days=32)
+                addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
+            except ValueError:
+                addebito_date = curr_dc + timedelta(days=30)
+                
+            st.session_state.movements.append({
+                "id": f"PREV_{datetime.datetime.now().timestamp()}_{i}",
+                "date_c": addebito_date, "date_v": addebito_date,
+                "acc_id": acc_id, "type": "Uscita (Prev)", "cat": "Saldo Carta",
+                "desc": f"Addebito carta: {desc}" if not desc else f"Addebito carta: {desc} ({i+1})", "amt": amt, "virtual": True
+            })
+        
+        st.session_state.movements.append({
+            "id": f"{datetime.datetime.now().timestamp()}_{i}",
+            "date_c": curr_dc, "date_v": curr_dv,
+            "acc_id": acc_id, "type": m_type, "cat": cat,
+            "desc": desc if i == 0 else f"{desc} ({i+1})" if desc else f"Ripetizione {i+1}", "amt": amt, "virtual": False
+        })
+
+# 6. WIDGET MOVIMENTO DIETRO "+" CON PULIZIA TOTALE FORM AL SUCCESS
 def render_movement_form(key_suffix=""):
-    with st.expander("➕ Aggiungi Nuovo Movimento"):
+    with st.expander(t("add_mov")):
         if not st.session_state.accounts:
-            st.warning("⚠️ Crea prima almeno un Conto o una Carta di Credito dalla Dashboard per poter inserire movimenti.")
+            st.warning(t("warning_no_acc"))
             return
 
         dc_key = f"dc_input_{key_suffix}"
@@ -105,56 +327,74 @@ def render_movement_form(key_suffix=""):
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            dc = st.date_input("Data Contabile", key=dc_key)
+            dc = st.date_input(t("data_cont"), key=dc_key)
             
         if dc != st.session_state[last_dc_key]:
             st.session_state[dv_key] = dc
             st.session_state[last_dc_key] = dc
 
         with col2:
-            dv = st.date_input("Data Valuta", key=dv_key)
+            dv = st.date_input(t("data_val"), key=dv_key)
         with col3:
-            acc_choice = st.selectbox("Seleziona Conto / Carta", [a['name'] for a in st.session_state.accounts], key=f"acc_sel_{key_suffix}")
+            acc_choice = st.selectbox(t("sel_acc"), [a['name'] for a in st.session_state.accounts], key=f"acc_sel_{key_suffix}")
 
         col4, col5, col6 = st.columns(3)
         with col4:
-            m_type = st.radio("Tipo Operazione", ["Entrata", "Uscita"], horizontal=True, key=f"m_type_{key_suffix}")
+            m_type = st.radio(t("op_type"), [t("entrata"), t("uscita")], horizontal=True, key=f"m_type_{key_suffix}")
         with col5:
-            cats = st.session_state.cats_in if m_type == "Entrata" else st.session_state.cats_out
-            cat = st.selectbox("Categoria", cats, key=f"cat_{key_suffix}")
+            # Seleziona categoria in base al tipo (Entrata o Uscita)
+            is_income = (m_type == t("entrata"))
+            cats = st.session_state.cats_in if is_income else st.session_state.cats_out
+            cat = st.selectbox(t("cat"), cats, key=f"cat_{key_suffix}")
         with col6:
-            amt = st.number_input("Importo", min_value=0.01, step=1.0, key=f"amt_{key_suffix}")
-            if m_type == "Uscita": amt = -amt
+            amt = st.number_input(t("importo"), min_value=0.01, step=1.0, key=f"amt_{key_suffix}")
+            if m_type == t("uscita"): amt = -amt
 
-        desc = st.text_input("Descrizione (Opzionale)", key=f"desc_{key_suffix}")
+        desc = st.text_input(t("desc"), key=f"desc_{key_suffix}")
 
-        if st.button("REGISTRA MOVIMENTO", key=f"btn_save_mov_{key_suffix}"):
+        # Sezione Ripetizione nel tempo
+        repeat_check = st.checkbox(t("repeat"), key=f"repeat_chk_{key_suffix}")
+        freq = "Mensile"
+        count = 1
+        if repeat_check:
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                freq = st.selectbox(t("freq"), [t("mensile"), t("annuale")], key=f"freq_sel_{key_suffix}")
+                freq = "Mensile" if freq == t("mensile") else "Annuale"
+            with rc2:
+                count = st.number_input(t("num_rip"), min_value=2, max_value=60, value=12, key=f"count_sel_{key_suffix}")
+
+        if st.button(t("btn_reg_mov"), key=f"btn_save_mov_{key_suffix}"):
             a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
-            add_movement(dc, dv, a_id, m_type, cat, desc, amt)
-            st.success("✅ Movimento inserito con successo!")
+            add_movement(dc, dv, a_id, m_type, cat, desc, amt, repeat=repeat_check, freq=freq, count=count)
+            st.success(t("succ_mov"))
+            # Pulizia completa form svuotando chiavi nello stato
+            for k in [dc_key, dv_key, f"amt_{key_suffix}", f"desc_{key_suffix}"]:
+                if k in st.session_state:
+                    del st.session_state[k]
             st.rerun()
 
-# 6. BARRA DI NAVIGAZIONE A PULSANTI
-st.title("⚡ MY FINANCE PRO")
+# 7. BARRA DI NAVIGAZIONE A PULSANTI
+st.title(t("title"))
 b1, b2, b3, b4 = st.columns(4)
 with b1:
-    if st.button("📊 DASHBOARD", use_container_width=True): st.session_state.active_tab = "DASHBOARD"
+    if st.button(t("dash"), use_container_width=True): st.session_state.active_tab = "DASHBOARD"
 with b2:
-    if st.button("📝 MOVIMENTI", use_container_width=True): st.session_state.active_tab = "MOVIMENTI"
+    if st.button(t("mov"), use_container_width=True): st.session_state.active_tab = "MOVIMENTI"
 with b3:
-    if st.button("📈 REPORT & CASH FLOW", use_container_width=True): st.session_state.active_tab = "REPORT"
+    if st.button(t("rep"), use_container_width=True): st.session_state.active_tab = "REPORT"
 with b4:
-    if st.button("⚙️ IMPOSTAZIONI", use_container_width=True): st.session_state.active_tab = "IMPOSTAZIONI"
+    if st.button(t("set"), use_container_width=True): st.session_state.active_tab = "IMPOSTAZIONI"
 
 st.divider()
 menu = st.session_state.active_tab
 
 # --- DASHBOARD ---
 if menu == "DASHBOARD":
-    st.subheader("Panoramica Patrimoniale e Conti")
+    st.subheader(t("panoramica"))
     
     total_cash = sum(get_account_balance(a) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
-    st.metric("LIQUIDITÀ TOTALE", f"{total_cash:,.2f} {st.session_state.settings['currency']}")
+    st.metric(t("tot_liq"), f"{total_cash:,.2f} {st.session_state.settings['currency']}")
 
     cols = st.columns(3)
     for i, acc in enumerate(st.session_state.accounts):
@@ -167,21 +407,22 @@ if menu == "DASHBOARD":
                 if acc['type'] == "Carta di Credito":
                     used = abs(sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and m['amt'] < 0 and not m.get('virtual')))
                     residuo = acc['plafond'] - used
-                    st.metric("Residuo Plafond", f"{residuo:,.2f}")
-                    st.caption(f"Scadenza: {acc.get('scadenza', 'N/D')}")
+                    st.metric(t("residuo_plaf"), f"{residuo:,.2f}")
+                    st.caption(f"{t('scadenza')}: {acc.get('scadenza', 'N/D')}")
                     st.progress(residuo / acc['plafond'] if acc['plafond'] > 0 else 0)
                 else:
                     st.metric("Saldo Attuale", f"{bal:,.2f}")
                 
-                if st.button("Elimina Conto", key=f"del_{acc['id']}"):
+                if st.button(t("del_conto"), key=f"del_{acc['id']}"):
                     st.session_state.accounts = [a for a in st.session_state.accounts if a['id'] != acc['id']]
                     st.rerun()
 
     st.divider()
 
-    with st.expander("➕ Aggiungi Nuovo Conto o Carta"):
-        t = st.selectbox("Tipo di Rapporto", ["Bancario", "Prepagata", "Carta di Credito"])
-        name = st.text_input("Nome Conto / Carta", key="acc_name_dash")
+    with st.expander(t("add_acc")):
+        t_acc = st.selectbox(t("type_acc"), ["Bancario", "Prepagata", "Carta di Credito"])
+        name_acc_key = "acc_name_dash_input"
+        name = st.text_input(t("name_acc"), key=name_acc_key)
         
         init = 0.0
         init_date = date.today()
@@ -189,42 +430,44 @@ if menu == "DASHBOARD":
         addebito = 1
         scadenza = date.today() + timedelta(days=365)
         
-        if t == "Carta di Credito":
+        if t_acc == "Carta di Credito":
             col_p1, col_p2, col_p3 = st.columns(3)
             with col_p1:
-                plafond = st.number_input("Plafond Mensile", value=1500.0, step=100.0, key="acc_plafond_dash")
+                plafond = st.number_input(t("plafond"), value=1500.0, step=100.0, key="acc_plafond_dash")
             with col_p2:
-                scadenza = st.date_input("Data Scadenza Carta", value=scadenza, key="acc_scad_dash")
+                scadenza = st.date_input(t("scad_carta"), value=scadenza, key="acc_scad_dash")
             with col_p3:
-                addebito = st.slider("Giorno Addebito", 1, 28, 1, key="acc_add_dash")
+                addebito = st.slider(t("giorno_add"), 1, 28, 1, key="acc_add_dash")
         else:
             col_i1, col_i2 = st.columns(2)
             with col_i1:
-                init = st.number_input("Saldo di Partenza", value=0.0, step=100.0, key="acc_init_dash")
+                init = st.number_input(t("init_bal"), value=0.0, step=100.0, key="acc_init_dash")
             with col_i2:
-                init_date = st.date_input("A che data hai questo saldo?", value=date.today(), key="acc_init_date_dash")
+                init_date = st.date_input(t("init_date"), value=date.today(), key="acc_init_date_dash")
         
-        if st.button("CREA CONTO / CARTA", key="btn_create_acc_dash"):
+        if st.button(t("btn_create_acc"), key="btn_create_acc_dash"):
             if name.strip() == "":
-                st.warning("Inserisci un nome valido per il conto.")
+                st.warning(t("err_name_acc"))
             else:
                 new_id = str(datetime.datetime.now().timestamp())
                 st.session_state.accounts.append({
-                    "id": new_id, "name": name, "type": t, 
+                    "id": new_id, "name": name, "type": t_acc, 
                     "init_bal": init, "init_date": init_date, 
                     "plafond": plafond, "addebito_day": addebito,
-                    "scadenza": scadenza.strftime("%d/%m/%Y") if t == "Carta di Credito" else ""
+                    "scadenza": scadenza.strftime("%d/%m/%Y") if t_acc == "Carta di Credito" else ""
                 })
-                st.success("✅ Conto o carta inserito con successo!")
+                st.success(t("succ_acc"))
+                if name_acc_key in st.session_state:
+                    del st.session_state[name_acc_key]
                 st.rerun()
 
 # --- MOVIMENTI ---
 elif menu == "MOVIMENTI":
-    st.subheader("Gestione Movimenti")
+    st.subheader(t("gest_mov"))
     render_movement_form(key_suffix="mov_tab")
 
     st.divider()
-    search = st.text_input("🔍 Cerca nei movimenti...", key="search_mov")
+    search = st.text_input(t("search_mov"), key="search_mov")
     df = pd.DataFrame(st.session_state.movements)
     if not df.empty:
         df_show = df[df['virtual'] == False]
@@ -232,21 +475,23 @@ elif menu == "MOVIMENTI":
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
         st.dataframe(df_show, use_container_width=True)
 
-# --- REPORT ---
+# --- REPORT & CASH FLOW (CORRETTO PER INCLUDERE SALDO BANCA E PERIODO) ---
 elif menu == "REPORT":
-    st.subheader("Analisi Cash Flow e Dettagli")
+    st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
 
     st.divider()
-    d_range = st.date_input("Seleziona Periodo Analisi (Passato & Futuro)", [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
+    d_range = st.date_input(t("sel_periodo"), [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
+        # Somma di TUTTI i saldi iniziali dei conti non carta (Il saldo banca/conti influenza totalmente i flussi di cassa!)
         initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
         
         df = pd.DataFrame(st.session_state.movements)
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
             
+            # Filtriamo i movimenti escludendo quelli precedenti alla data di saldo iniziale del rispettivo conto
             valid_rows = []
             for _, row in df.iterrows():
                 acc = next((a for a in st.session_state.accounts if a['id'] == row['acc_id']), None)
@@ -261,8 +506,11 @@ elif menu == "REPORT":
             
             if not df_valid.empty:
                 df_sorted = df_valid.sort_values('date_c').copy()
+                
+                # Calcolo del patrimonio cumulativo considerando il saldo iniziale banca come punto di partenza assoluto
                 df_sorted['cumulative_flow'] = initial_total_balance + df_sorted['amt'].cumsum()
                 
+                # Filtraggio per il periodo selezionato dall'utente
                 mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
                 df_filtered = df_sorted[mask]
                 
@@ -270,20 +518,20 @@ elif menu == "REPORT":
                 u = df_filtered[df_filtered['amt'] < 0]['amt'].sum()
                 
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Totale Entrate", f"{e:,.2f}")
-                c2.metric("Totale Uscite", f"{u:,.2f}")
-                c3.metric("Flusso Netto Periodo", f"{e+u:,.2f}")
+                c1.metric(t("tot_entrate"), f"{e:,.2f}")
+                c2.metric(t("tot_uscite"), f"{u:,.2f}")
+                c3.metric(t("flusso_netto"), f"{e+u:,.2f}")
                 
-                fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
+                fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title=t("trend_cf"), template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
                 fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
                 st.plotly_chart(fig, use_container_width=True)
                 
-                st.markdown("### 🔍 Dettaglio Movimenti per Categoria")
-                filter_mode = st.radio("Fissa vista dettaglio:", ["Tutti", "Solo Entrate", "Solo Uscite"], horizontal=True, key="filter_mode")
+                st.markdown(f"### {t('dett_cat')}")
+                filter_mode = st.radio(t("vista_dett"), [t("tutti"), t("solo_ent"), t("solo_usc")], horizontal=True, key="filter_mode")
                 
-                if filter_mode == "Solo Entrate":
+                if filter_mode == t("solo_ent"):
                     df_detail = df_filtered[df_filtered['amt'] > 0]
-                elif filter_mode == "Solo Uscite":
+                elif filter_mode == t("solo_usc"):
                     df_detail = df_filtered[df_filtered['amt'] < 0]
                 else:
                     df_detail = df_filtered
@@ -292,24 +540,23 @@ elif menu == "REPORT":
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
-    st.subheader("⚙️ Configurazioni App")
+    st.subheader(t("config_app"))
     
-    # Nascondiamo la gestione categorie sotto un expander pulito
-    with st.expander("📁 Gestisci Classificazione Categorie"):
+    with st.expander(t("gest_cat")):
         col_c1, col_c2 = st.columns(2)
         
         with col_c1:
-            st.markdown("#### 📥 Entrate")
+            st.markdown(f"#### 📥 {t('entrata')}")
             new_cat_in = st.text_input("Nuova categoria entrata", key="input_new_cat_in")
             if st.button("Aggiungi Entrata", key="btn_add_cat_in"):
                 if new_cat_in.strip() and new_cat_in not in st.session_state.cats_in:
                     st.session_state.cats_in.append(new_cat_in.strip())
-                    st.success(f"✅ Categoria '{new_cat_in}' aggiunta!")
+                    st.success("✅ Aggiunta con successo!")
                     st.rerun()
                 elif not new_cat_in.strip():
                     st.warning("Inserisci un nome valido.")
                 else:
-                    st.info("La categoria esiste già.")
+                    st.info("Esiste già.")
             
             st.markdown("##### Categorie attuali:")
             for cat in list(st.session_state.cats_in):
@@ -320,20 +567,20 @@ elif menu == "IMPOSTAZIONI":
                         st.session_state.cats_in.remove(cat)
                         st.rerun()
                     else:
-                        st.error("Minimo 1 categoria richiesta.")
+                        st.error("Minimo 1.")
 
         with col_c2:
-            st.markdown("#### 📤 Uscite")
+            st.markdown(f"#### 📤 {t('uscita')}")
             new_cat_out = st.text_input("Nuova categoria uscita", key="input_new_cat_out")
             if st.button("Aggiungi Uscita", key="btn_add_cat_out"):
                 if new_cat_out.strip() and new_cat_out not in st.session_state.cats_out:
                     st.session_state.cats_out.append(new_cat_out.strip())
-                    st.success(f"✅ Categoria '{new_cat_out}' aggiunta!")
+                    st.success("✅ Aggiunta con successo!")
                     st.rerun()
                 elif not new_cat_out.strip():
                     st.warning("Inserisci un nome valido.")
                 else:
-                    st.info("La categoria esiste già.")
+                    st.info("Esiste già.")
             
             st.markdown("##### Categorie attuali:")
             for cat in list(st.session_state.cats_out):
@@ -344,12 +591,14 @@ elif menu == "IMPOSTAZIONI":
                         st.session_state.cats_out.remove(cat)
                         st.rerun()
                     else:
-                        st.error("Minimo 1 categoria richiesta.")
+                        st.error("Minimo 1.")
 
-    # Nascondiamo le preferenze generali sotto un altro expander pulito
-    with st.expander("🌐 Preferenze Lingua e Valuta"):
-        st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS, index=LANGS.index(st.session_state.settings['lang']))
-        st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS, index=CURRS.index(st.session_state.settings['currency']))
-        if st.button("SALVA IMPOSTAZIONI", key="btn_save_set"):
-            st.success("✅ Impostazioni salvate con successo!")
+    with st.expander(t("pref_ling")):
+        selected_lang = st.selectbox(t("lingua"), LANGS, index=LANGS.index(st.session_state.settings['lang']))
+        selected_curr = st.selectbox(t("valuta"), CURRS, index=CURRS.index(st.session_state.settings['currency']))
+        
+        if st.button(t("btn_salva_set"), key="btn_save_set"):
+            st.session_state.settings['lang'] = selected_lang
+            st.session_state.settings['currency'] = selected_curr
+            st.success(t("succ_set"))
             st.rerun()
