@@ -39,10 +39,14 @@ if 'settings' not in st.session_state:
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "DASHBOARD"
 
+# Inizializzazione categorie personalizzabili nello state
+if 'cats_in' not in st.session_state:
+    st.session_state.cats_in = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
+if 'cats_out' not in st.session_state:
+    st.session_state.cats_out = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
+
 LANGS = ["IT", "EN", "FR", "ES", "DE", "PT", "ZH", "JA", "RU", "AR"]
 CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
-CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
-CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
 # 3. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF
 def get_account_balance(acc):
@@ -82,7 +86,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
         "desc": desc, "amt": amt, "virtual": False
     })
 
-# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE DATE UNIDIREZIONALE
+# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE UNIDIREZIONALE DATE E CATEGORIE DINAMICHE
 def render_movement_form(key_suffix=""):
     with st.expander("➕ Aggiungi Nuovo Movimento"):
         if not st.session_state.accounts:
@@ -93,7 +97,6 @@ def render_movement_form(key_suffix=""):
         dv_key = f"dv_input_{key_suffix}"
         last_dc_key = f"last_dc_{key_suffix}"
         
-        # Inizializzazione date nello stato se non esistono
         if dc_key not in st.session_state:
             st.session_state[dc_key] = date.today()
         if dv_key not in st.session_state:
@@ -105,7 +108,6 @@ def render_movement_form(key_suffix=""):
         with col1:
             dc = st.date_input("Data Contabile", key=dc_key)
             
-        # Logica di sincronizzazione: se la data contabile è cambiata rispetto all'ultimo controllo, aggiorna la valuta
         if dc != st.session_state[last_dc_key]:
             st.session_state[dv_key] = dc
             st.session_state[last_dc_key] = dc
@@ -119,7 +121,7 @@ def render_movement_form(key_suffix=""):
         with col4:
             m_type = st.radio("Tipo Operazione", ["Entrata", "Uscita"], horizontal=True, key=f"m_type_{key_suffix}")
         with col5:
-            cats = CATS_IN if m_type == "Entrata" else CATS_OUT
+            cats = st.session_state.cats_in if m_type == "Entrata" else st.session_state.cats_out
             cat = st.selectbox("Categoria", cats, key=f"cat_{key_suffix}")
         with col6:
             amt = st.number_input("Importo", min_value=0.01, step=1.0, key=f"amt_{key_suffix}")
@@ -178,7 +180,6 @@ if menu == "DASHBOARD":
 
     st.divider()
 
-    # Form inserimento Conto/Carta nascosta dietro un "+" (Expander)
     with st.expander("➕ Aggiungi Nuovo Conto o Carta"):
         t = st.selectbox("Tipo di Rapporto", ["Bancario", "Prepagata", "Carta di Credito"])
         name = st.text_input("Nome Conto / Carta", key="acc_name_dash")
@@ -296,6 +297,64 @@ elif menu == "IMPOSTAZIONI":
     render_movement_form(key_suffix="set_tab")
 
     st.divider()
+    
+    st.markdown("### ⚙️ Gestione Categorie Movimenti")
+    col_c1, col_c2 = st.columns(2)
+    
+    # Gestione Categorie Entrate
+    with col_c1:
+        with st.container(border=True):
+            st.markdown("#### 📥 Categorie Entrate")
+            new_cat_in = st.text_input("Nuova categoria entrata", key="input_new_cat_in")
+            if st.button("Aggiungi Entrata", key="btn_add_cat_in"):
+                if new_cat_in.strip() and new_cat_in not in st.session_state.cats_in:
+                    st.session_state.cats_in.append(new_cat_in.strip())
+                    st.success(f"Categoria '{new_cat_in}' aggiunta!")
+                    st.rerun()
+                elif not new_cat_in.strip():
+                    st.warning("Inserisci un nome valido.")
+                else:
+                    st.info("La categoria esiste già.")
+            
+            st.markdown("##### Categorie attuali:")
+            for cat in list(st.session_state.cats_in):
+                c_del1, c_del2 = st.columns([3, 1])
+                c_del1.text(cat)
+                if c_del2.button("🗑️", key=f"del_cat_in_{cat}"):
+                    if len(st.session_state.cats_in) > 1:
+                        st.session_state.cats_in.remove(cat)
+                        st.rerun()
+                    else:
+                        st.error("Devi mantenere almeno una categoria.")
+
+    # Gestione Categorie Uscite
+    with col_c2:
+        with st.container(border=True):
+            st.markdown("#### 📤 Categorie Uscite")
+            new_cat_out = st.text_input("Nuova categoria uscita", key="input_new_cat_out")
+            if st.button("Aggiungi Uscita", key="btn_add_cat_out"):
+                if new_cat_out.strip() and new_cat_out not in st.session_state.cats_out:
+                    st.session_state.cats_out.append(new_cat_out.strip())
+                    st.success(f"Categoria '{new_cat_out}' aggiunta!")
+                    st.rerun()
+                elif not new_cat_out.strip():
+                    st.warning("Inserisci un nome valido.")
+                else:
+                    st.info("La categoria esiste già.")
+            
+            st.markdown("##### Categorie attuali:")
+            for cat in list(st.session_state.cats_out):
+                c_del1, c_del2 = st.columns([3, 1])
+                c_del1.text(cat)
+                if c_del2.button("🗑️", key=f"del_cat_out_{cat}"):
+                    if len(st.session_state.cats_out) > 1:
+                        st.session_state.cats_out.remove(cat)
+                        st.rerun()
+                    else:
+                        st.error("Devi mantenere almeno una categoria.")
+
+    st.divider()
+    st.markdown("### 🌐 Preferenze Generali")
     st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS, index=LANGS.index(st.session_state.settings['lang']))
     st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS, index=CURRS.index(st.session_state.settings['currency']))
     if st.button("SALVA IMPOSTAZIONI", key="btn_save_set"):
