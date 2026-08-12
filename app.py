@@ -50,8 +50,6 @@ def get_account_balance(acc):
     init_bal = acc['init_bal']
     init_date = acc.get('init_date', date.min)
     
-    # Filtriamo solo i movimenti reali (non virtuali) del conto
-    # e prendiamo solo quelli con data >= alla data del saldo iniziale
     valid_movements = [
         m for m in st.session_state.movements 
         if m['acc_id'] == acc_id and not m.get('virtual') and pd.to_datetime(m['date_c']).date() >= init_date
@@ -84,7 +82,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
         "desc": desc, "amt": amt, "virtual": False
     })
 
-# 5. FUNZIONE WIDGET UNIFICATO NASCOSTO DIETRO UN "+" (Expander)
+# 5. WIDGET MOVIMENTO DIETRO "+"
 def render_movement_form(key_suffix=""):
     with st.expander("➕ Aggiungi Nuovo Movimento"):
         if not st.session_state.accounts:
@@ -144,7 +142,6 @@ menu = st.session_state.active_tab
 if menu == "DASHBOARD":
     st.subheader("Panoramica Patrimoniale e Conti")
     
-    # Calcolo liquidità totale escludendo le carte di credito e applicando la regola del saldo iniziale
     total_cash = sum(get_account_balance(a) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
     st.metric("LIQUIDITÀ TOTALE", f"{total_cash:,.2f} {st.session_state.settings['currency']}")
 
@@ -171,9 +168,8 @@ if menu == "DASHBOARD":
 
     st.divider()
 
-    # Inserimento Semplificato Unico per Conto o Carta con Data Saldo Iniziale
-    with st.container(border=True):
-        st.subheader("➕ Aggiungi Nuovo Conto o Carta")
+    # Form inserimento Conto/Carta nascosta dietro un "+" (Expander)
+    with st.expander("➕ Aggiungi Nuovo Conto o Carta"):
         t = st.selectbox("Tipo di Rapporto", ["Bancario", "Prepagata", "Carta di Credito"])
         name = st.text_input("Nome Conto / Carta", key="acc_name_dash")
         
@@ -235,14 +231,12 @@ elif menu == "REPORT":
     d_range = st.date_input("Seleziona Periodo Analisi (Passato & Futuro)", [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
-        # Somma dei saldi iniziali di tutti i conti non carta
         initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
         
         df = pd.DataFrame(st.session_state.movements)
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
             
-            # Filtriamo i movimenti escludendo quelli precedenti alla data di saldo iniziale del rispettivo conto
             valid_rows = []
             for _, row in df.iterrows():
                 acc = next((a for a in st.session_state.accounts if a['id'] == row['acc_id']), None)
@@ -270,7 +264,7 @@ elif menu == "REPORT":
                 c2.metric("Totale Uscite", f"{u:,.2f}")
                 c3.metric("Flusso Netto Periodo", f"{e+u:,.2f}")
                 
-                fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale (Taglio storico post-saldo iniziale)", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
+                fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
                 fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
                 st.plotly_chart(fig, use_container_width=True)
                 
