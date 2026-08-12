@@ -89,7 +89,7 @@ TRANSLATIONS = {
         "tot_uscite": "Totale Uscite",
         "flusso_netto": "Flusso Netto Periodo",
         "trend_cf": "Trend Cash Flow Patrimoniale (Incluso Saldo Iniziale Banca)",
-        "dett_cat": "🔍 Dettaglio Movimenti per Categoria",
+        "dett_cat": "🔍 Struttura Contabile Cash Flow per Macrovoci",
         "vista_dett": "Fissa vista dettaglio:",
         "tutti": "Tutti",
         "solo_ent": "Solo Entrate",
@@ -150,7 +150,7 @@ TRANSLATIONS = {
         "tot_uscite": "Total Expenses",
         "flusso_netto": "Net Period Flow",
         "trend_cf": "Patrimonial Cash Flow Trend (Incl. Bank Initial Balance)",
-        "dett_cat": "🔍 Transaction Details by Category",
+        "dett_cat": "🔍 Cash Flow Macro-Categories Statement",
         "vista_dett": "Filter detail view:",
         "tutti": "All",
         "solo_ent": "Only Income",
@@ -211,7 +211,7 @@ TRANSLATIONS = {
         "tot_uscite": "Total Dépenses",
         "flusso_netto": "Flux Net de la Période",
         "trend_cf": "Tendance du Flux (Solde Initial de Banque Inclus)",
-        "dett_cat": "🔍 Détails par Catégorie",
+        "dett_cat": "🔍 État des Flux par Macro-Catégories",
         "vista_dett": "Filtrer la vue:",
         "tutti": "Tous",
         "solo_ent": "Seulement Revenus",
@@ -457,15 +457,13 @@ if menu == "DASHBOARD":
                     del st.session_state[name_acc_key]
                 st.rerun()
 
-# --- MOVIMENTI (CON GESTIONE MODIFICA ED ELIMINAZIONE) ---
+# --- MOVIMENTI ---
 elif menu == "MOVIMENTI":
     st.subheader(t("gest_mov"))
     render_movement_form(key_suffix="mov_tab")
 
     st.divider()
     search = st.text_input(t("search_mov"), key="search_mov")
-    
-    # Filtriamo i movimenti reali
     real_movs = [m for m in st.session_state.movements if not m.get('virtual')]
     if search:
         real_movs = [m for m in real_movs if search.lower() in m.get('desc', '').lower() or search.lower() in m.get('cat', '').lower()]
@@ -481,7 +479,6 @@ elif menu == "MOVIMENTI":
                 c4.text(m['desc'] if m['desc'] else "-")
                 c5.text(f"{m['amt']:,.2f}")
                 
-                # Bottoni azione rapida per ogni movimento
                 b_col1, b_col2 = c6.columns(2)
                 with b_col1:
                     if st.button("✏️", key=f"edit_btn_{m['id']}"):
@@ -491,19 +488,16 @@ elif menu == "MOVIMENTI":
                         st.session_state.movements = [item for item in st.session_state.movements if item['id'] != m['id']]
                         st.rerun()
                 
-                # Pannello Modifica inline se attivato
                 if st.session_state.get(f"editing_{m['id']}", False):
                     st.divider()
                     st.markdown(f"**Modifica Movimento:** {m['desc']}")
-                    
                     e_col1, e_col2, e_col3 = st.columns(3)
                     with e_col1:
                         new_dc = st.date_input("Data Contabile", value=pd.to_datetime(m['date_c']).date(), key=f"ed_dc_{m['id']}")
                     with e_col2:
                         new_cat = st.text_input("Categoria", value=m['cat'], key=f"ed_cat_{m['id']}")
                     with e_col3:
-                        new_amt = st.number_input("Importo (positivo o negativo)", value=float(m['amt']), step=1.0, key=f"ed_amt_{m['id']}")
-                        
+                        new_amt = st.number_input("Importo", value=float(m['amt']), step=1.0, key=f"ed_amt_{m['id']}")
                     new_desc = st.text_input("Descrizione", value=m['desc'], key=f"ed_desc_{m['id']}")
                     
                     sc1, sc2 = st.columns(2)
@@ -524,7 +518,7 @@ elif menu == "MOVIMENTI":
     else:
         st.info("Nessun movimento registrato.")
 
-# --- REPORT & CASH FLOW ---
+# --- REPORT & CASH FLOW (STRUTTURA MACROVOCI POPOLATE E NON) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
@@ -536,8 +530,11 @@ elif menu == "REPORT":
         df = pd.DataFrame(st.session_state.movements)
         
         base_rows = []
+        init_bank_total = 0.0
         for acc in st.session_state.accounts:
             if acc['type'] != "Carta di Credito":
+                init_val = acc.get('init_bal', 0.0)
+                init_bank_total += init_val
                 base_rows.append({
                     "id": f"init_bank_{acc['id']}",
                     "date_c": acc.get('init_date', d_range[0]),
@@ -546,7 +543,7 @@ elif menu == "REPORT":
                     "type": "Saldo Iniziale",
                     "cat": "Capitale Iniziale",
                     "desc": f"Saldo iniziale conto: {acc['name']}",
-                    "amt": acc.get('init_bal', 0.0),
+                    "amt": init_val,
                     "virtual": False
                 })
         
@@ -581,17 +578,48 @@ elif menu == "REPORT":
             fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
             
+            # --- TABELLA STRUTTURA MACROVOCI (POPOLATE E A ZERO) ---
             st.markdown(f"### {t('dett_cat')}")
-            filter_mode = st.radio(t("vista_dett"), [t("tutti"), t("solo_ent"), t("solo_usc")], horizontal=True, key="filter_mode")
             
-            if filter_mode == t("solo_ent"):
-                df_detail = df_period_movements[df_period_movements['amt'] > 0]
-            elif filter_mode == t("solo_usc"):
-                df_detail = df_period_movements[df_period_movements['amt'] < 0]
-            else:
-                df_detail = df_period_movements
+            # Calcoliamo i totali per ogni singola categoria esistente (sia IN che OUT)
+            summary_data = []
+            
+            # Aggiungiamo Saldo Banca Iniziale come prima macrovoce di struttura
+            summary_data.append({
+                "Flusso / Categoria": "➕ Saldo Iniziale Banca (Stock)",
+                "Tipo": "Capitale",
+                "Importo": init_bank_total
+            })
+            
+            # Entrate (Mostriamo tutte quelle configurate, anche a 0)
+            for cat_in in st.session_state.cats_in:
+                cat_sum = df_period_movements[(df_period_movements['cat'] == cat_in) & (df_period_movements['amt'] > 0)]['amt'].sum()
+                summary_data.append({
+                    "Flusso / Categoria": f"+ {cat_in}",
+                    "Tipo": "Entrata",
+                    "Importo": cat_sum
+                })
                 
-            st.dataframe(df_detail[['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
+            # Uscite (Mostriamo tutte quelle configurate, anche a 0)
+            for cat_out in st.session_state.cats_out:
+                cat_sum = df_period_movements[(df_period_movements['cat'] == cat_out) & (df_period_movements['amt'] < 0)]['amt'].sum()
+                summary_data.append({
+                    "Flusso / Categoria": f"- {cat_out}",
+                    "Tipo": "Uscita",
+                    "Importo": cat_sum
+                })
+                
+            df_summary = pd.DataFrame(summary_data)
+            
+            filter_mode = st.radio(t("vista_dett"), [t("tutti"), t("solo_ent"), t("solo_usc")], horizontal=True, key="filter_mode")
+            if filter_mode == t("solo_ent"):
+                df_summary_show = df_summary[df_summary['Tipo'].isin(["Capitale", "Entrata"])]
+            elif filter_mode == t("solo_usc"):
+                df_summary_show = df_summary[df_summary['Tipo'].isin(["Capitale", "Uscita"])]
+            else:
+                df_summary_show = df_summary
+                
+            st.dataframe(df_summary_show, use_container_width=True, hide_index=True)
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
