@@ -161,64 +161,6 @@ TRANSLATIONS = {
         "scadenza": "Expiry",
         "warning_no_acc": "⚠️ Please create at least one Account or Credit Card from the Dashboard first.",
         "err_name_acc": "Please enter a valid account name."
-    },
-    "FR": {
-        "title": "⚡ MY FINANCE PRO",
-        "dash": "📊 TABLEAU DE BORD",
-        "mov": "📝 TRANSACTIONS",
-        "rep": "📈 RAPPORT & FLUX DE TRÉSORERIE",
-        "set": "⚙️ PARAMÈTRES",
-        "tot_liq": "LIQUIDITÉ TOTALE",
-        "panoramica": "Aperçu des Actifs & Comptes",
-        "add_acc": "➕ Ajouter un Compte ou une Carte",
-        "type_acc": "Type de Compte",
-        "name_acc": "Nom du Compte / Carte",
-        "init_bal": "Solde Initial",
-        "init_date": "À quelle date avez-vous ce solde ?",
-        "plafond": "Plafond Mensuel",
-        "scad_carta": "Date d'Expiration de la Carte",
-        "giorno_add": "Jour de Prélèvement",
-        "btn_create_acc": "CRÉER COMPTE / CARTE",
-        "succ_acc": "✅ Compte ou carte créé avec succès !",
-        "add_mov": "➕ Ajouter une Transaction",
-        "data_cont": "Date Comptable",
-        "data_val": "Date de Valeur",
-        "sel_acc": "Sélectionner Compte / Carte",
-        "op_type": "Type d'Opération",
-        "entrata": "Revenu",
-        "uscita": "Dépense",
-        "cat": "Catégorie",
-        "importo": "Montant",
-        "desc": "Description (Optionnel)",
-        "repeat": "Répéter la transaction dans le temps",
-        "freq": "Fréquence",
-        "mensile": "Mensuel",
-        "annuale": "Annuel",
-        "num_rip": "Nombre de répétitions",
-        "btn_reg_mov": "ENREGISTRER LA TRANSACTION",
-        "succ_mov": "✅ Transaction enregistrée avec succès !",
-        "search_mov": "🔍 Rechercher des transactions...",
-        "gest_mov": "Gestion et Modification",
-        "analisi_cf": "Analyse du Flux & Détails",
-        "sel_periodo": "Sélectionner la Période (Passé & Futur)",
-        "trend_cf": "Tendance du Flux (Solde Initial de Banque Inclus)",
-        "dett_cat": "📊 Schéma des Flux par Macro-Catégories",
-        "vista_dett": "Filtrer la vue:",
-        "tutti": "Tous",
-        "solo_ent": "Seulement Revenus",
-        "solo_usc": "Seulement Dépenses",
-        "config_app": "⚙️ Configuration de l'App",
-        "gest_cat": "📁 Gérer les Catégories",
-        "pref_ling": "🌐 Préférences de Langue & Devise",
-        "lingua": "Langue",
-        "valuta": "Devise",
-        "btn_salva_set": "ENREGISTRER LES PARAMÈTRES",
-        "succ_set": "✅ Paramètres enregistrés avec succès !",
-        "del_conto": "Supprimer le Compte",
-        "residuo_plaf": "Plafond Restant",
-        "scadenza": "Expiration",
-        "warning_no_acc": "⚠️ Veuillez d'abord créer un Compte ou une Carte.",
-        "err_name_acc": "Veuillez entrer un nom valide."
     }
 }
 
@@ -509,11 +451,9 @@ elif menu == "MOVIMENTI":
     else:
         st.info("Nessun movimento registrato.")
 
-# --- REPORT & CASH FLOW (SCHEMA PURO CON CONSUNTIVO EFFETTIVO) ---
+# --- REPORT & CASH FLOW (SCHEMA INTERO PURO SENZA TOTALI IN ALTO) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
-    
-    # RIMOSSO COMPLETAMENTE render_movement_form da qui (niente inserimento movimenti nella dash del cash flow)
 
     st.divider()
     d_range = st.date_input(t("sel_periodo"), [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
@@ -556,7 +496,7 @@ elif menu == "REPORT":
             df_filtered_period = df_sorted[mask_period]
             df_period_movements = df_filtered_period[df_filtered_period['type'] != "Saldo Iniziale"]
             
-            # Distinzione tra movimenti schedulati (futuri/tutti) ed effettivamente REALIZZATI (fino ad oggi)
+            # --- RESOCONTO DI QUANTO EFFETTIVAMENTE REALIZZATO (CONSUNTIVO AD OGGI) ---
             today_date = date.today()
             df_realized = df_period_movements[pd.to_datetime(df_period_movements['date_c']).dt.date <= today_date]
             
@@ -564,7 +504,6 @@ elif menu == "REPORT":
             u_real = df_realized[df_realized['amt'] < 0]['amt'].sum()
             net_real = e_real + u_real
             
-            # --- SEZIONE CONSUNTIVO EFFETTIVO ---
             st.markdown("### 📌 Resoconto di quanto effettivamente realizzato (Consuntivo ad oggi)")
             rc1, rc2, rc3 = st.columns(3)
             rc1.metric("Entrate Realizzate", f"{e_real:,.2f}")
@@ -579,44 +518,55 @@ elif menu == "REPORT":
             fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
             
-            # --- SCHEMA CASH FLOW PURO (SENZA TOTALI DI RIGA ESTERNI) ---
+            # --- SCHEMA CASH FLOW PURO A LARGHEZZA PIENA ---
             st.markdown(f"### {t('dett_cat')}")
             
             summary_data = []
             
             # Riga del Saldo (Differenziata graficamente con etichetta dedicata)
             summary_data.append({
-                "Schema Cash Flow (Macrovoci)": "+/- SALDO INIZIALE BANCA (Stock)",
+                "Schema Cash Flow (Macrovoci)": "[SALDO] +/- SALDO INIZIALE BANCA (Stock)",
                 "Importo": init_bank_total
             })
             
-            # Entrate
+            # Entrate del periodo filtrato
+            period_entrate_sum = 0.0
             for cat_in in st.session_state.cats_in:
                 cat_sum = df_period_movements[(df_period_movements['cat'] == cat_in) & (df_period_movements['amt'] > 0)]['amt'].sum()
+                period_entrate_sum += cat_sum
                 summary_data.append({
                     "Schema Cash Flow (Macrovoci)": f"+ {cat_in}",
                     "Importo": cat_sum
                 })
                 
-            # Uscite
+            # Uscite del periodo filtrato
+            period_uscite_sum = 0.0
             for cat_out in st.session_state.cats_out:
                 cat_sum = df_period_movements[(df_period_movements['cat'] == cat_out) & (df_period_movements['amt'] < 0)]['amt'].sum()
+                period_uscite_sum += cat_sum
                 summary_data.append({
                     "Schema Cash Flow (Macrovoci)": f"- {cat_out}",
                     "Importo": cat_sum
                 })
                 
+            # Totale Finale di periodo (Saldo Iniziale + Entrate - Uscite) nel range filtrato
+            totale_finale_periodo = init_bank_total + period_entrate_sum + period_uscite_sum
+            summary_data.append({
+                "Schema Cash Flow (Macrovoci)": "[TOTALE FINALE] SALDO FINALE DEL PERIODO FILTRATO",
+                "Importo": totale_finale_periodo
+            })
+                
             df_summary = pd.DataFrame(summary_data)
             
             filter_mode = st.radio(t("vista_dett"), [t("tutti"), t("solo_ent"), t("solo_usc")], horizontal=True, key="filter_mode")
             if filter_mode == t("solo_ent"):
-                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\+", case=False, regex=True)]
+                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\+|TOTALE", case=False, regex=True)]
             elif filter_mode == t("solo_usc"):
-                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\-", case=False, regex=True)]
+                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\-|TOTALE", case=False, regex=True)]
             else:
                 df_summary_show = df_summary
                 
-            # Visualizzazione pulita del solo schema senza totali calcolati in fondo alla tabella
+            # Visualizzazione a schermo intero senza barre laterali e con il totale finale integrato nello schema
             st.dataframe(df_summary_show, use_container_width=True, hide_index=True)
 
 # --- IMPOSTAZIONI ---
