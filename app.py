@@ -82,7 +82,7 @@ TRANSLATIONS = {
         "btn_reg_mov": "REGISTRA MOVIMENTO",
         "succ_mov": "✅ Movimento inserito con successo!",
         "search_mov": "🔍 Cerca nei movimenti...",
-        "gest_mov": "Gestione Movimenti",
+        "gest_mov": "Gestione e Modifica Movimenti",
         "analisi_cf": "Analisi Cash Flow e Dettagli",
         "sel_periodo": "Seleziona Periodo Analisi (Passato & Futuro)",
         "tot_entrate": "Totale Entrate",
@@ -143,7 +143,7 @@ TRANSLATIONS = {
         "btn_reg_mov": "REGISTER TRANSACTION",
         "succ_mov": "✅ Transaction successfully registered!",
         "search_mov": "🔍 Search transactions...",
-        "gest_mov": "Transactions Management",
+        "gest_mov": "Transactions Management & Editing",
         "analisi_cf": "Cash Flow Analysis & Details",
         "sel_periodo": "Select Analysis Period (Passato & Futuro)",
         "tot_entrate": "Total Income",
@@ -204,7 +204,7 @@ TRANSLATIONS = {
         "btn_reg_mov": "ENREGISTRER LA TRANSACTION",
         "succ_mov": "✅ Transaction enregistrée avec succès !",
         "search_mov": "🔍 Rechercher des transactions...",
-        "gest_mov": "Gestion des Transactions",
+        "gest_mov": "Gestion et Modification",
         "analisi_cf": "Analyse du Flux & Détails",
         "sel_periodo": "Sélectionner la Période (Passé & Futur)",
         "tot_entrate": "Total Revenus",
@@ -457,21 +457,74 @@ if menu == "DASHBOARD":
                     del st.session_state[name_acc_key]
                 st.rerun()
 
-# --- MOVIMENTI ---
+# --- MOVIMENTI (CON GESTIONE MODIFICA ED ELIMINAZIONE) ---
 elif menu == "MOVIMENTI":
     st.subheader(t("gest_mov"))
     render_movement_form(key_suffix="mov_tab")
 
     st.divider()
     search = st.text_input(t("search_mov"), key="search_mov")
-    df = pd.DataFrame(st.session_state.movements)
-    if not df.empty:
-        df_show = df[df['virtual'] == False]
-        if search:
-            df_show = df_show[df_show['desc'].str.contains(search, case=False)]
-        st.dataframe(df_show, use_container_width=True)
+    
+    # Filtriamo i movimenti reali
+    real_movs = [m for m in st.session_state.movements if not m.get('virtual')]
+    if search:
+        real_movs = [m for m in real_movs if search.lower() in m.get('desc', '').lower() or search.lower() in m.get('cat', '').lower()]
 
-# --- REPORT & CASH FLOW (LOGICA DEFINITIVA STOCK + FLUSSI PERMANENTI) ---
+    if real_movs:
+        st.markdown("### Elenco Movimenti Registrati")
+        for m in real_movs:
+            with st.container(border=True):
+                c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 3, 2, 2])
+                c1.text(str(m['date_c']))
+                c2.text(m['type'])
+                c3.text(m['cat'])
+                c4.text(m['desc'] if m['desc'] else "-")
+                c5.text(f"{m['amt']:,.2f}")
+                
+                # Bottoni azione rapida per ogni movimento
+                b_col1, b_col2 = c6.columns(2)
+                with b_col1:
+                    if st.button("✏️", key=f"edit_btn_{m['id']}"):
+                        st.session_state[f"editing_{m['id']}"] = True
+                with b_col2:
+                    if st.button("🗑️", key=f"del_btn_{m['id']}"):
+                        st.session_state.movements = [item for item in st.session_state.movements if item['id'] != m['id']]
+                        st.rerun()
+                
+                # Pannello Modifica inline se attivato
+                if st.session_state.get(f"editing_{m['id']}", False):
+                    st.divider()
+                    st.markdown(f"**Modifica Movimento:** {m['desc']}")
+                    
+                    e_col1, e_col2, e_col3 = st.columns(3)
+                    with e_col1:
+                        new_dc = st.date_input("Data Contabile", value=pd.to_datetime(m['date_c']).date(), key=f"ed_dc_{m['id']}")
+                    with e_col2:
+                        new_cat = st.text_input("Categoria", value=m['cat'], key=f"ed_cat_{m['id']}")
+                    with e_col3:
+                        new_amt = st.number_input("Importo (positivo o negativo)", value=float(m['amt']), step=1.0, key=f"ed_amt_{m['id']}")
+                        
+                    new_desc = st.text_input("Descrizione", value=m['desc'], key=f"ed_desc_{m['id']}")
+                    
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        if st.button("Salva Modifiche", key=f"save_edit_{m['id']}"):
+                            m['date_c'] = new_dc
+                            m['date_v'] = new_dc
+                            m['cat'] = new_cat
+                            m['amt'] = new_amt
+                            m['desc'] = new_desc
+                            st.session_state[f"editing_{m['id']}"] = False
+                            st.success("Modifiche salvate!")
+                            st.rerun()
+                    with sc2:
+                        if st.button("Annulla", key=f"cancel_edit_{m['id']}"):
+                            st.session_state[f"editing_{m['id']}"] = False
+                            st.rerun()
+    else:
+        st.info("Nessun movimento registrato.")
+
+# --- REPORT & CASH FLOW ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
@@ -482,7 +535,6 @@ elif menu == "REPORT":
     if len(d_range) == 2:
         df = pd.DataFrame(st.session_state.movements)
         
-        # 1. Creiamo le righe di stock iniziale per ogni conto (posizionate esattamente alla loro data di inizio)
         base_rows = []
         for acc in st.session_state.accounts:
             if acc['type'] != "Carta di Credito":
@@ -508,14 +560,9 @@ elif menu == "REPORT":
             
         if not df_combined.empty:
             df_combined['date_c'] = pd.to_datetime(df_combined['date_c']).dt.date
-            
-            # 2. Ordiniamo tutto rigorosamente in ordine cronologico dall'inizio dei tempi
             df_sorted = df_combined.sort_values('date_c').copy()
-            
-            # 3. Il cumulativo accumula la somma algebrica da sinistra a destra (dal saldo iniziale in poi per sempre)
             df_sorted['cumulative_flow'] = df_sorted['amt'].cumsum()
             
-            # 4. Metriche calcolate ESCLUSIVAMENTE sul periodo selezionato dall'utente (es. dal 12 agosto al 12 agosto)
             mask_period = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
             df_filtered_period = df_sorted[mask_period]
             df_period_movements = df_filtered_period[df_filtered_period['type'] != "Saldo Iniziale"]
@@ -528,7 +575,6 @@ elif menu == "REPORT":
             c2.metric(t("tot_uscite"), f"{u:,.2f}")
             c3.metric(t("flusso_netto"), f"{e+u:,.2f}")
             
-            # 5. Il grafico mostra l'evoluzione del patrimonio includendo la history completa fino alla fine del range scelto
             df_for_chart = df_sorted[df_sorted['date_c'] <= d_range[1]]
             
             fig = px.area(df_for_chart, x='date_c', y='cumulative_flow', title=t("trend_cf"), template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
@@ -611,4 +657,3 @@ elif menu == "IMPOSTAZIONI":
             st.session_state.settings['currency'] = selected_curr
             st.success(t("succ_set"))
             st.rerun()
-            
