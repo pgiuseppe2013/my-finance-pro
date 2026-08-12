@@ -36,21 +36,17 @@ if 'movements' not in st.session_state:
 if 'settings' not in st.session_state:
     st.session_state.settings = {"lang": "IT", "currency": "EUR"}
 
-# Liste Configurazione
 LANGS = ["IT", "EN", "FR", "ES", "DE", "PT", "ZH", "JA", "RU", "AR"]
 CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
 CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
 CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
 # 3. FUNZIONI LOGICHE SMART
-def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt, is_rec=False):
-    # Logica Addebito Carta: Se spesa su Carta, genera previsione mese N+1
+def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
     acc = next((a for a in st.session_state.accounts if a['id'] == acc_id), None)
     if acc and acc['type'] == "Carta di Credito" and amt < 0:
-        # Previsione addebito mese prossimo
         next_month = m_date_c.replace(day=1) + timedelta(days=32)
         addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
-        # Aggiungiamo un movimento virtuale "futuro"
         st.session_state.movements.append({
             "id": f"PREV_{datetime.datetime.now().timestamp()}",
             "date_c": addebito_date, "date_v": addebito_date,
@@ -72,12 +68,10 @@ menu = st.sidebar.selectbox("MENU", ["DASHBOARD", "MOVIMENTI", "REPORT (CASH FLO
 if menu == "DASHBOARD":
     st.title("⚡ DASHBOARD FINANZIARIA")
     
-    # Widget Totale
     total_cash = sum(a['init_bal'] + sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == a['id'] and not m.get('virtual')) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
     st.metric("LIQUIDITÀ TOTALE", f"{total_cash:,.2f} {st.session_state.settings['currency']}")
 
     cols = st.columns(3)
-    # Lista Conti
     for i, acc in enumerate(st.session_state.accounts):
         with cols[i % 3]:
             with st.container(border=True):
@@ -96,7 +90,6 @@ if menu == "DASHBOARD":
                     st.session_state.accounts = [a for a in st.session_state.accounts if a['id'] != acc['id']]
                     st.rerun()
 
-    # Form Nuovo Conto
     with st.expander("➕ AGGIUNGI NUOVO CONTO / CARTA"):
         t = st.selectbox("Tipo", ["Bancario", "Prepagata", "Carta di Credito"])
         name = st.text_input("Nome")
@@ -119,38 +112,39 @@ if menu == "DASHBOARD":
 elif menu == "MOVIMENTI":
     st.title("📝 LISTA MOVIMENTI")
     
-    with st.container(border=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            dc = st.date_input("Data Contabile", key="dc")
-        with c2:
-            dv = st.date_input("Data Valuta", value=dc, key="dv")
-        with c3:
-            acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts])
-        
-        c4, c5, c6 = st.columns(3)
-        with c4:
-            m_type = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True)
-        with c5:
-            cats = CATS_IN if m_type == "Entrata" else CATS_OUT
-            cat = st.selectbox("Categoria", cats)
-        with c6:
-            amt = st.number_input("Importo", min_value=0.01)
-            if m_type == "Uscita": amt = -amt
-        
-        desc = st.text_input("Descrizione (Opt)")
-        if st.button("INSERISCI MOVIMENTO"):
-            a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
-            add_movement(dc, dv, a_id, m_type, cat, desc, amt)
-            st.success("Inserito!")
-            st.rerun()
+    if not st.session_state.accounts:
+        st.warning("Crea prima almeno un conto o una carta dalla Dashboard!")
+    else:
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                dc = st.date_input("Data Contabile", key="dc")
+            with c2:
+                dv = st.date_input("Data Valuta", value=dc, key="dv")
+            with c3:
+                acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts])
+            
+            c4, c5, c6 = st.columns(3)
+            with c4:
+                m_type = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True)
+            with c5:
+                cats = CATS_IN if m_type == "Entrata" else CATS_OUT
+                cat = st.selectbox("Categoria", cats)
+            with c6:
+                amt = st.number_input("Importo", min_value=0.01)
+                if m_type == "Uscita": amt = -amt
+            
+            desc = st.text_input("Descrizione (Opt)")
+            if st.button("INSERISCI MOVIMENTO"):
+                a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
+                add_movement(dc, dv, a_id, m_type, cat, desc, amt)
+                st.success("Inserito!")
+                st.rerun()
 
-    # Ricerca e Ordinamento
     st.divider()
     search = st.text_input("Cerca nei movimenti...")
     df = pd.DataFrame(st.session_state.movements)
     if not df.empty:
-        # Filtro virtuali per la tabella principale
         df_show = df[df['virtual'] == False]
         if search:
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
@@ -168,7 +162,8 @@ elif menu == "REPORT (CASH FLOW)":
             mask = (df['date_c'] >= d_range[0]) & (df['date_c'] <= d_range[1])
             df_filtered = df[mask]
             
-            e, u = df_filtered[df_filtered['amt'] > 0]['amt'].sum(), df_filtered[df_filtered['amt'] < 0]['amt'].sum()
+            e = df_filtered[df_filtered['amt'] > 0]['amt'].sum()
+            u = df_filtered[df_filtered['amt'] < 0]['amt'].sum()
             c1, c2, c3 = st.columns(3)
             c1.metric("Entrate", f"{e:,.2f}")
             c2.metric("Uscite", f"{u:,.2f}")
@@ -185,4 +180,3 @@ elif menu == "IMPOSTAZIONI":
     st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS)
     if st.button("SALVA & REFRESH"):
         st.rerun()
-
