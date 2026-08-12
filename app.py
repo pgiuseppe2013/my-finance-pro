@@ -88,7 +88,7 @@ TRANSLATIONS = {
         "tot_entrate": "Totale Entrate",
         "tot_uscite": "Totale Uscite",
         "flusso_netto": "Flusso Netto Periodo",
-        "trend_cf": "Trend Cash Flow Patrimoniale (Incluso Saldo Iniziale)",
+        "trend_cf": "Trend Cash Flow Patrimoniale (Incluso Saldo Iniziale Banca)",
         "dett_cat": "🔍 Dettaglio Movimenti per Categoria",
         "vista_dett": "Fissa vista dettaglio:",
         "tutti": "Tutti",
@@ -149,7 +149,7 @@ TRANSLATIONS = {
         "tot_entrate": "Total Income",
         "tot_uscite": "Total Expenses",
         "flusso_netto": "Net Period Flow",
-        "trend_cf": "Patrimonial Cash Flow Trend (Incl. Initial Balance)",
+        "trend_cf": "Patrimonial Cash Flow Trend (Incl. Bank Initial Balance)",
         "dett_cat": "🔍 Transaction Details by Category",
         "vista_dett": "Filter detail view:",
         "tutti": "All",
@@ -210,7 +210,7 @@ TRANSLATIONS = {
         "tot_entrate": "Total Revenus",
         "tot_uscite": "Total Dépenses",
         "flusso_netto": "Flux Net de la Période",
-        "trend_cf": "Tendance du Flux de Trésorerie (Solde Initial Inclus)",
+        "trend_cf": "Tendance du Flux (Solde Initial de Banque Inclus)",
         "dett_cat": "🔍 Détails par Catégorie",
         "vista_dett": "Filtrer la vue:",
         "tutti": "Tous",
@@ -265,7 +265,6 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt, repeat=Fals
             curr_dv = m_date_v
         else:
             if freq == "Mensile":
-                # Avanza di i mesi
                 try:
                     curr_dc = m_date_c.replace(day=1) + timedelta(days=32 * i)
                     curr_dc = curr_dc.replace(day=m_date_c.day)
@@ -276,7 +275,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt, repeat=Fals
                     curr_dv = curr_dv.replace(day=m_date_v.day)
                 except ValueError:
                     curr_dv = m_date_v + timedelta(days=30 * i)
-            else: # Annuale
+            else:
                 try:
                     curr_dc = m_date_c.replace(year=m_date_c.year + i)
                 except ValueError:
@@ -342,7 +341,6 @@ def render_movement_form(key_suffix=""):
         with col4:
             m_type = st.radio(t("op_type"), [t("entrata"), t("uscita")], horizontal=True, key=f"m_type_{key_suffix}")
         with col5:
-            # Seleziona categoria in base al tipo (Entrata o Uscita)
             is_income = (m_type == t("entrata"))
             cats = st.session_state.cats_in if is_income else st.session_state.cats_out
             cat = st.selectbox(t("cat"), cats, key=f"cat_{key_suffix}")
@@ -352,7 +350,6 @@ def render_movement_form(key_suffix=""):
 
         desc = st.text_input(t("desc"), key=f"desc_{key_suffix}")
 
-        # Sezione Ripetizione nel tempo
         repeat_check = st.checkbox(t("repeat"), key=f"repeat_chk_{key_suffix}")
         freq = "Mensile"
         count = 1
@@ -368,7 +365,6 @@ def render_movement_form(key_suffix=""):
             a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
             add_movement(dc, dv, a_id, m_type, cat, desc, amt, repeat=repeat_check, freq=freq, count=count)
             st.success(t("succ_mov"))
-            # Pulizia completa form svuotando chiavi nello stato
             for k in [dc_key, dv_key, f"amt_{key_suffix}", f"desc_{key_suffix}"]:
                 if k in st.session_state:
                     del st.session_state[k]
@@ -475,7 +471,7 @@ elif menu == "MOVIMENTI":
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
         st.dataframe(df_show, use_container_width=True)
 
-# --- REPORT & CASH FLOW (CORRETTO PER INCLUDERE SALDO BANCA E PERIODO) ---
+# --- REPORT & CASH FLOW (CORRETTO E POTENZIATO SUL SALDO INIZIALE CONTI) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
@@ -484,14 +480,14 @@ elif menu == "REPORT":
     d_range = st.date_input(t("sel_periodo"), [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
-        # Somma di TUTTI i saldi iniziali dei conti non carta (Il saldo banca/conti influenza totalmente i flussi di cassa!)
+        # Somma di TUTTI i saldi iniziali dei conti registrati (Banca/Prepagate escluse le carte di credito)
         initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
         
         df = pd.DataFrame(st.session_state.movements)
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
             
-            # Filtriamo i movimenti escludendo quelli precedenti alla data di saldo iniziale del rispettivo conto
+            # Filtro temporale dei movimenti validi rispetto alla data di cut-off dei singoli conti
             valid_rows = []
             for _, row in df.iterrows():
                 acc = next((a for a in st.session_state.accounts if a['id'] == row['acc_id']), None)
@@ -505,12 +501,13 @@ elif menu == "REPORT":
             df_valid = pd.DataFrame(valid_rows) if valid_rows else pd.DataFrame(columns=df.columns)
             
             if not df_valid.empty:
+                # Ordinamento cronologico fondamentale per calcolare il cumulativo corretto
                 df_sorted = df_valid.sort_values('date_c').copy()
                 
-                # Calcolo del patrimonio cumulativo considerando il saldo iniziale banca come punto di partenza assoluto
+                # Il saldo banca di partenza diventa la base da cui accumulare i movimenti nel tempo
                 df_sorted['cumulative_flow'] = initial_total_balance + df_sorted['amt'].cumsum()
                 
-                # Filtraggio per il periodo selezionato dall'utente
+                # Filtraggio sul range temporale scelto dall'utente per il grafico e metriche
                 mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
                 df_filtered = df_sorted[mask]
                 
