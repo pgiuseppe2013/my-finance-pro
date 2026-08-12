@@ -25,7 +25,7 @@ st.markdown("""
         color: #22c55e;
     }
     div[data-testid="stMetricValue"] { color: #22c55e; font-family: 'Urbanist', sans-serif; font-weight: 700; }
-    .stDateInput input, .stTextInput input { background-color: #0f172a !important; color: #f8fafc !important; border: 1px solid #334155 !important; }
+    .stDateInput input, .stTextInput input, .stNumberInput input { background-color: #0f172a !important; color: #f8fafc !important; border: 1px solid #334155 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -79,6 +79,9 @@ with b4:
 st.divider()
 menu = st.session_state.active_tab
 
+# Formato data dinamico in base alla lingua
+date_format_str = "DD/MM/YYYY" if st.session_state.settings['lang'] == "IT" else "YYYY/MM/DD"
+
 # --- DASHBOARD ---
 if menu == "DASHBOARD":
     st.subheader("Panoramica Patrimoniale")
@@ -97,6 +100,7 @@ if menu == "DASHBOARD":
                     used = abs(sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and m['amt'] < 0))
                     residuo = acc['plafond'] - used
                     st.metric("Residuo Plafond", f"{residuo:,.2f}")
+                    st.caption(f"Scadenza: {acc.get('scadenza', 'N/D')}")
                     st.progress(residuo / acc['plafond'] if acc['plafond'] > 0 else 0)
                 else:
                     st.metric("Saldo Attuale", f"{bal:,.2f}")
@@ -105,22 +109,60 @@ if menu == "DASHBOARD":
                     st.session_state.accounts = [a for a in st.session_state.accounts if a['id'] != acc['id']]
                     st.rerun()
 
+    st.divider()
+    
+    # Inserimento rapido movimento direttamente dalla Dashboard
+    st.subheader("⚡ Inserimento Rapido Movimento")
+    if not st.session_state.accounts:
+        st.info("Crea prima almeno un conto o carta qui sotto per registrare movimenti.")
+    else:
+        with st.container(border=True):
+            dc_dash = st.date_input("Data Contabile", key="dc_dash")
+            dv_dash = st.date_input("Data Valuta", value=dc_dash, key="dv_dash")
+            acc_choice_d = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts], key="acc_d")
+            
+            c_t1, c_t2, c_t3 = st.columns(3)
+            with c_t1:
+                m_type_d = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True, key="m_type_d")
+            with c_t2:
+                cats_d = CATS_IN if m_type_d == "Entrata" else CATS_OUT
+                cat_d = st.selectbox("Categoria", cats_d, key="cat_d")
+            with c_t3:
+                amt_d = st.number_input("Importo", min_value=0.01, key="amt_d")
+                if m_type_d == "Uscita": amt_d = -amt_d
+            
+            desc_d = st.text_input("Descrizione (Opzionale)", key="desc_d")
+            if st.button("REGISTRA MOVIMENTO (DASHBOARD)", key="btn_reg_dash"):
+                a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice_d)
+                add_movement(dc_dash, dv_dash, a_id, m_type_d, cat_d, desc_d, amt_d)
+                st.success("Movimento registrato con successo!")
+                st.rerun()
+
+    st.divider()
     with st.expander("➕ AGGIUNGI NUOVO CONTO / CARTA"):
         t = st.selectbox("Tipo", ["Bancario", "Prepagata", "Carta di Credito"])
-        name = st.text_input("Nome Conto")
-        init = st.number_input("Saldo di partenza", value=0.0)
+        name = st.text_input("Nome Conto / Carta", key="new_acc_name")
+        
+        init = 0.0
         plafond = 0.0
         addebito = 1
-        if t == "Carta di Credito":
-            plafond = st.number_input("Plafond Mensile", value=1500.0)
-            addebito = st.slider("Giorno Addebito (Mese Succ)", 1, 28, 1)
+        scadenza = date.today() + timedelta(days=365)
         
-        if st.button("CREA CONTO"):
+        if t == "Carta di Credito":
+            plafond = st.number_input("Plafond Mensile", value=1500.0, key="new_acc_plafond")
+            scadenza = st.date_input("Data di Scadenza Carta", value=scadenza, key="new_acc_scad")
+            addebito = st.slider("Giorno Addebito (Mese Succ)", 1, 28, 1, key="new_acc_add")
+        else:
+            init = st.number_input("Saldo di partenza", value=0.0, key="new_acc_init")
+        
+        if st.button("CREA CONTO / CARTA", key="btn_create_acc"):
             new_id = str(datetime.datetime.now().timestamp())
             st.session_state.accounts.append({
                 "id": new_id, "name": name, "type": t, 
-                "init_bal": init, "plafond": plafond, "addebito_day": addebito
+                "init_bal": init, "plafond": plafond, "addebito_day": addebito,
+                "scadenza": scadenza.strftime("%d/%m/%Y") if t == "Carta di Credito" else ""
             })
+            st.success("Creato con successo!")
             st.rerun()
 
 # --- MOVIMENTI ---
@@ -131,33 +173,45 @@ elif menu == "MOVIMENTI":
         st.warning("Crea prima almeno un conto o una carta dalla Dashboard!")
     else:
         with st.container(border=True):
+            # Gestione automatica data contabile -> valuta
+            if 'last_dc' not in st.session_state:
+                st.session_state.last_dc = date.today()
+            if 'last_dv' not in st.session_state:
+                st.session_state.last_dv = date.today()
+
             c1, c2, c3 = st.columns(3)
             with c1:
-                dc = st.date_input("Data Contabile", key="dc")
+                dc = st.date_input("Data Contabile", key="dc_main")
             with c2:
-                dv = st.date_input("Data Valuta", value=dc, key="dv")
+                # Se la data contabile è cambiata rispetto all'ultimo giro, aggiorna anche la valuta
+                if dc != st.session_state.last_dc:
+                    st.session_state.last_dv = dc
+                    st.session_state.last_dc = dc
+                dv = st.date_input("Data Valuta", value=st.session_state.last_dv, key="dv_main")
+                if dv != st.session_state.last_dv:
+                    st.session_state.last_dv = dv # Aggiorna se modificata manualmente a parte
             with c3:
-                acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts])
+                acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts], key="acc_main")
             
             c4, c5, c6 = st.columns(3)
             with c4:
-                m_type = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True)
+                m_type = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True, key="m_type_main")
             with c5:
                 cats = CATS_IN if m_type == "Entrata" else CATS_OUT
-                cat = st.selectbox("Categoria", cats)
+                cat = st.selectbox("Categoria", cats, key="cat_main")
             with c6:
-                amt = st.number_input("Importo", min_value=0.01)
+                amt = st.number_input("Importo", min_value=0.01, key="amt_main")
                 if m_type == "Uscita": amt = -amt
             
-            desc = st.text_input("Descrizione (Opzionale)")
-            if st.button("INSERISCI MOVIMENTO"):
+            desc = st.text_input("Descrizione (Opzionale)", key="desc_main")
+            if st.button("INSERISCI MOVIMENTO", key="btn_ins_mov"):
                 a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
                 add_movement(dc, dv, a_id, m_type, cat, desc, amt)
                 st.success("Movimento inserito con successo!")
                 st.rerun()
 
     st.divider()
-    search = st.text_input("🔍 Cerca nei movimenti...")
+    search = st.text_input("🔍 Cerca nei movimenti...", key="search_mov")
     df = pd.DataFrame(st.session_state.movements)
     if not df.empty:
         df_show = df[df['virtual'] == False]
@@ -168,7 +222,8 @@ elif menu == "MOVIMENTI":
 # --- REPORT ---
 elif menu == "REPORT":
     st.subheader("Analisi Cash Flow e Dettagli")
-    d_range = st.date_input("Seleziona Periodo Analisi", [date.today() - timedelta(days=30), date.today() + timedelta(days=30)])
+    # Range esteso nel passato e nel futuro (speculare)
+    d_range = st.date_input("Seleziona Periodo Analisi", [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
         df = pd.DataFrame(st.session_state.movements)
@@ -185,12 +240,12 @@ elif menu == "REPORT":
             c2.metric("Totale Uscite", f"{u:,.2f}")
             c3.metric("Flusso Netto", f"{e+u:,.2f}")
             
-            fig = px.area(df.sort_values('date_c'), x='date_c', y='amt', title="Trend Cash Flow (Incl. Previsioni)", template="plotly_dark")
+            fig = px.area(df.sort_values('date_c'), x='date_c', y='amt', title="Trend Cash Flow (Passato & Futuro Previsto)", template="plotly_dark")
             fig.update_traces(line_color='#22c55e')
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("### 🔍 Dettaglio Movimenti per Categoria")
-            filter_mode = st.radio("Fissa vista dettaglio:", ["Tutti", "Solo Entrate", "Solo Uscite"], horizontal=True)
+            filter_mode = st.radio("Fissa vista dettaglio:", ["Tutti", "Solo Entrate", "Solo Uscite"], horizontal=True, key="filter_mode")
             
             if filter_mode == "Solo Entrate":
                 df_detail = df_filtered[df_filtered['amt'] > 0]
@@ -204,8 +259,8 @@ elif menu == "REPORT":
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
     st.subheader("Configurazioni App")
-    st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS)
-    st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS)
-    if st.button("SALVA IMPOSTAZIONI"):
+    st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS, index=LANGS.index(st.session_state.settings['lang']))
+    st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS, index=CURRS.index(st.session_state.settings['currency']))
+    if st.button("SALVA IMPOSTAZIONI", key="btn_save_set"):
         st.success("Impostazioni salvate!")
         st.rerun()
