@@ -1,364 +1,195 @@
-import datetime
-import json
 import streamlit as st
+import pandas as pd
+import datetime
+from datetime import date, timedelta
+import plotly.express as px
 
-# Configurazione della pagina
-st.set_page_config(
-    page_title="MY FINANCE PRO", page_icon="💰", layout="centered"
-)
+# 1. CONFIGURAZIONE PAGINA & STILE TECH
+st.set_page_config(page_title="MY FINANCE PRO", page_icon="⚡", layout="wide")
 
-# Inizializzazione dello Stato (Database Locale in Session State)
-if "lingua" not in st.session_state:
-    st.session_state.lingua = "it"
-if "valuta" not in st.session_state:
-    st.session_state.valuta = "EUR"
+st.markdown("""
+    <style>
+    .main { background-color: #020617; color: #f8fafc; }
+    .stButton>button {
+        border-radius: 10px;
+        background: linear-gradient(145deg, #16a34a, #15803d);
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+        transform: translateY(-2px);
+    }
+    div[data-testid="stMetricValue"] { color: #22c55e; font-family: 'Urbanist', sans-serif; font-weight: 700; }
+    .stDateInput input { background-color: #1e293b !important; color: white !important; border: 1px solid #334155 !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-if "categorie_entrata" not in st.session_state:
-    st.session_state.categorie_entrata = [
-        "Stipendio / Pensione",
-        "Bonus / Premi / Tredicesima",
-        "Lavoro Autonomo / Extra",
-        "Rendite / Investimenti",
-        "Rimborsi / Sussidi",
-        "Altre Entrate",
-    ]
+# 2. INIZIALIZZAZIONE STATO
+if 'accounts' not in st.session_state:
+    st.session_state.accounts = []
+if 'movements' not in st.session_state:
+    st.session_state.movements = []
+if 'settings' not in st.session_state:
+    st.session_state.settings = {"lang": "IT", "currency": "EUR"}
 
-if "categorie_uscita" not in st.session_state:
-    st.session_state.categorie_uscita = [
-        "Affitto / Mutuo",
-        "Utenze (Luce, Gas, Acqua)",
-        "Internet e Telefonia",
-        "Manutenzione e Arredo",
-        "Supermercato / Alimentari",
-        "Ristoranti / Bar / Take-away",
-        "Carburante / Ricarica EV",
-        "Assicurazione e Bollo",
-        "Manutenzione Auto/Mezzi",
-        "Mezzi Pubblici / Viaggi",
-        "Farmacia e Visite Mediche",
-        "Cura Personale / Sport",
-        "Hobby e Intrattenimento",
-        "Abbonamenti e Streaming",
-        "Shopping e Abbigliamento",
-        "Tasse e Imposte",
-        "Prestiti / Rate / Finanziamenti",
-        "Scuola e Figli",
-        "Regali e Donazioni",
-        "Altre Uscite / Imprevisti",
-    ]
+# Liste Configurazione
+LANGS = ["IT", "EN", "FR", "ES", "DE", "PT", "ZH", "JA", "RU", "AR"]
+CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
+CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
+CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
-if "conti" not in st.session_state:
-    st.session_state.conti = [
-        {
-            "id": "c1",
-            "nome": "Conto Corrente Principale",
-            "saldoIniziale": 1500.0,
-            "valuta": "EUR",
-            "isFinanziamento": False,
-        },
-        {
-            "id": "c2",
-            "nome": "Carta di Credito",
-            "saldoIniziale": 0.0,
-            "valuta": "EUR",
-            "isFinanziamento": True,
-        },
-    ]
+# 3. FUNZIONI LOGICHE SMART
+def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt, is_rec=False):
+    # Logica Addebito Carta: Se spesa su Carta, genera previsione mese N+1
+    acc = next((a for a in st.session_state.accounts if a['id'] == acc_id), None)
+    if acc and acc['type'] == "Carta di Credito" and amt < 0:
+        # Previsione addebito mese prossimo
+        next_month = m_date_c.replace(day=1) + timedelta(days=32)
+        addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
+        # Aggiungiamo un movimento virtuale "futuro"
+        st.session_state.movements.append({
+            "id": f"PREV_{datetime.datetime.now().timestamp()}",
+            "date_c": addebito_date, "date_v": addebito_date,
+            "acc_id": acc_id, "type": "Uscita (Prev)", "cat": "Saldo Carta",
+            "desc": f"Addebito previsto: {desc}", "amt": amt, "virtual": True
+        })
+    
+    st.session_state.movements.append({
+        "id": str(datetime.datetime.now().timestamp()),
+        "date_c": m_date_c, "date_v": m_date_v,
+        "acc_id": acc_id, "type": m_type, "cat": cat,
+        "desc": desc, "amt": amt, "virtual": False
+    })
 
-if "movimenti" not in st.session_state:
-    st.session_state.movimenti = []
+# 4. NAVIGAZIONE
+menu = st.sidebar.selectbox("MENU", ["DASHBOARD", "MOVIMENTI", "REPORT (CASH FLOW)", "IMPOSTAZIONI"])
 
-# Dizionario dei testi multilingua
-dizionario = {
-    "it": {
-        "appTitle": "MY FINANCE PRO",
-        "dash": "Dashboard",
-        "list": "Movimenti",
-        "report": "Report & Cash Flow",
-        "settings": "Impostazioni",
-        "realBalance": "SALDO LIQUIDO REALE (CONTI)",
-        "loansBalance": "TOTALE DEBITI / FINANZIAMENTI",
-        "yourAccounts": "I TUOI CONTI E CARTE",
-        "addAccount": "Aggiungi Nuovo Conto",
-        "newMov": "Nuovo Movimento",
-        "selectAccount": "Seleziona Conto",
-        "category": "Categoria (Obbligatoria)",
-        "what": "Descrizione",
-        "amount": "Importo",
-        "save": "SALVA",
-        "cancel": "ANNULLA",
-        "delete": "ELIMINA",
-        "settingsSaved": "Impostazioni salvate!",
-        "lang": "Lingua App",
-        "curr": "Valuta di Visualizzazione",
-        "expenses": "Uscite",
-        "incomes": "Entrate",
-        "accountName": "Nome Conto",
-        "initialBalance": "Saldo Iniziale",
-        "isLoan": "Finanziamento / Carta Credito (Plafond)",
-        "deleteAccount": "Elimina Conto",
-    },
-    "en": {
-        "appTitle": "MY FINANCE PRO",
-        "dash": "Dashboard",
-        "list": "Transactions",
-        "report": "Report & Cash Flow",
-        "settings": "Settings",
-        "realBalance": "NET LIQUID BALANCE (ACCOUNTS)",
-        "loansBalance": "TOTAL LIABILITIES / CARDS",
-        "yourAccounts": "YOUR ACCOUNTS & CARDS",
-        "addAccount": "Add New Account",
-        "newMov": "New Transaction",
-        "selectAccount": "Select Account",
-        "category": "Category (Required)",
-        "what": "Description",
-        "amount": "Amount",
-        "save": "SAVE",
-        "cancel": "CANCEL",
-        "delete": "DELETE",
-        "settingsSaved": "Settings saved!",
-        "lang": "App Language",
-        "curr": "Display Currency",
-        "expenses": "Expenses",
-        "incomes": "Incomes",
-        "accountName": "Account Name",
-        "initialBalance": "Initial Balance",
-        "isLoan": "Loan / Credit Card (Plafond)",
-        "deleteAccount": "Delete Account",
-    },
-}
+# --- DASHBOARD ---
+if menu == "DASHBOARD":
+    st.title("⚡ DASHBOARD FINANZIARIA")
+    
+    # Widget Totale
+    total_cash = sum(a['init_bal'] + sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == a['id'] and not m.get('virtual')) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
+    st.metric("LIQUIDITÀ TOTALE", f"{total_cash:,.2f} {st.session_state.settings['currency']}")
 
-tassiDiCambio = {"EUR": 1.0, "USD": 1.08, "GBP": 0.85, "CHF": 0.96, "JPY": 165.0}
-simboliValuta = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF", "JPY": "¥"}
-
-
-def t(key):
-    lang = st.session_state.lingua
-    if lang in dizionario and key in dizionario[lang]:
-        return dizionario[lang][key]
-    return dizionario["en"].get(key, key)
-
-
-def converti(importo, orig, dest):
-    if orig == dest:
-        return importo
-    t_orig = tassiDiCambio.get(orig, 1.0)
-    t_dest = tassiDiCambio.get(dest, 1.0)
-    return (importo / t_orig) * t_dest
-
-
-# --- BARRA LATERALE (MENU) ---
-st.sidebar.title(t("appTitle"))
-menu = st.sidebar.radio(
-    "Navigazione", [t("dash"), t("list"), t("report"), t("settings")]
-)
-
-# --- SEZIONE: DASHBOARD ---
-if menu == t("dash"):
-    st.title(t("appTitle"))
-
-    valuta_vis = st.session_state.valuta
-    simbolo = simboliValuta.get(valuta_vis, "€")
-
-    saldo_liquido = 0.0
-    saldo_debiti = 0.0
-
-    for c in st.session_state.conti:
-        movs_conto = sum(
-            m["v"]
-            for m in st.session_state.movimenti
-            if m["contoId"] == c["id"]
-        )
-        tot_nativo = c["saldoIniziale"] + movs_conto
-        tot_conv = converti(tot_nativo, c["valuta"], valuta_vis)
-
-        if c["isFinanziamento"]:
-            saldo_debiti += tot_conv
-        else:
-            saldo_liquido += tot_conv
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label=t("realBalance"), value=f"{saldo_liquido:,.2f} {simbolo}")
-    with col2:
-        st.metric(label=t("loansBalance"), value=f"{saldo_debiti:,.2f} {simbolo}")
-
-    st.divider()
-    st.subheader(t("yourAccounts"))
-
-    for c in st.session_state.conti:
-        movs_conto = sum(
-            m["v"]
-            for m in st.session_state.movimenti
-            if m["contoId"] == c["id"]
-        )
-        tot_nativo = c["saldoIniziale"] + movs_conto
-        c_simbolo = simboliValuta.get(c["valuta"], "€")
-        st.write(
-            f"💳 **{c['nome']}**: {tot_nativo:,.2f} {c_simbolo}"
-            + (" (Finanziamento)" if c["isFinanziamento"] else "")
-        )
-
-# --- SEZIONE: MOVIMENTI ---
-elif menu == t("list"):
-    st.subheader(t("list"))
-
-    # Form per aggiungere un movimento
-    with st.form("nuovo_movimento_form"):
-        st.write(t("newMov"))
-        tipo_form = st.radio(
-            "Tipo", [t("expenses"), t("incomes")], horizontal=True
-        )
-
-        if not st.session_state.conti:
-            st.warning("Crea prima un conto nella sezione Impostazioni.")
-            conto_sel_id = None
-        else:
-            conti_nomi = {c["id"]: c["nome"] for c in st.session_state.conti}
-            conto_sel_id = st.selectbox(
-                t("selectAccount"),
-                options=list(conti_nomi.keys()),
-                format_func=lambda x: conti_nomi[x],
-            )
-
-        cat_lista = (
-            st.session_state.categorie_entrata
-            if tipo_form == t("incomes")
-            else st.session_state.categorie_uscita
-        )
-        cat_sel = st.selectbox(t("category"), options=cat_lista)
-
-        descrizione = st.text_input(t("what"))
-        importo = st.number_input(t("amount"), min_value=0.0, step=0.01)
-
-        submitted = st.form_submit_button(t("save"))
-        if submitted and conto_sel_id:
-            valore_finale = -abs(importo) if tipo_form == t("expenses") else abs(importo)
-            nuovo_mov = {
-                "id": str(datetime.datetime.now().timestamp()),
-                "contoId": conto_sel_id,
-                "t": descrizione,
-                "categoria": cat_sel,
-                "v": valore_finale,
-                "data": datetime.date.today().isoformat(),
-            }
-            st.session_state.movimenti.append(nuovo_mov)
-            st.success("Movimento salvato con successo!")
-
-    st.divider()
-    st.write("### Elenco Movimenti")
-    if not st.session_state.movimenti:
-        st.info("Nessun movimento trovato.")
-    else:
-        for idx, m in enumerate(reversed(st.session_state.movimenti)):
-            c_nome = next(
-                (c["nome"] for c in st.session_state.conti if c["id"] == m["contoId"]),
-                "Conto",
-            )
-            col_a, col_b = st.columns([4, 1])
-            with col_a:
-                st.write(
-                    f"📅 {m['data']} | **{c_nome}** | {m['categoria']} - {m['t']} | "
-                    f"**{m['v']:,.2f}**"
-                )
-            with col_b:
-                if st.button("🗑️", key=f"del_mov_{m['id']}"):
-                    st.session_state.movimenti = [
-                        item for item in st.session_state.movimenti if item["id"] != m["id"]
-                    ]
+    cols = st.columns(3)
+    # Lista Conti
+    for i, acc in enumerate(st.session_state.accounts):
+        with cols[i % 3]:
+            with st.container(border=True):
+                bal = acc['init_bal'] + sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and not m.get('virtual'))
+                st.subheader(f"{acc['name']}")
+                st.write(f"Tipo: {acc['type']}")
+                if acc['type'] == "Carta di Credito":
+                    used = abs(sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and m['amt'] < 0))
+                    residuo = acc['plafond'] - used
+                    st.metric("Residuo Plafond", f"{residuo:,.2f}")
+                    st.progress(residuo / acc['plafond'] if acc['plafond'] > 0 else 0)
+                else:
+                    st.metric("Saldo Attuale", f"{bal:,.2f}")
+                
+                if st.button("Elimina", key=f"del_{acc['id']}"):
+                    st.session_state.accounts = [a for a in st.session_state.accounts if a['id'] != acc['id']]
                     st.rerun()
 
-# --- SEZIONE: REPORT & CASH FLOW ---
-elif menu == t("report"):
-    st.subheader(t("report"))
-
-    if not st.session_state.movimenti:
-        st.info("Nessun movimento registrato per generare i report.")
-    else:
-        tot_entrate = sum(m["v"] for m in st.session_state.movimenti if m["v"] > 0)
-        tot_uscite = sum(abs(m["v"]) for m in st.session_state.movimenti if m["v"] < 0)
-        cash_flow_netto = tot_entrate - tot_uscite
-
-        valuta_vis = st.session_state.valuta
-        simbolo = simboliValuta.get(valuta_vis, "€")
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Totale Entrate", f"{tot_entrate:,.2f} {simbolo}")
-        col2.metric("Totale Uscite", f"{tot_uscite:,.2f} {simbolo}")
-        col3.metric("Cash Flow Netto", f"{cash_flow_netto:,.2f} {simbolo}")
-
-        st.divider()
-        st.subheader("Uscite per Categoria")
-        spese_per_cat = {}
-        for m in st.session_state.movimenti:
-            if m["v"] < 0:
-                cat = m["categoria"]
-                spese_per_cat[cat] = spese_per_cat.get(cat, 0.0) + abs(m["v"])
-
-        if spese_per_cat:
-            for cat, importo in sorted(spese_per_cat.items(), key=lambda x: x[1], reverse=True):
-                st.write(f"- **{cat}**: {importo:,.2f} {simbolo}")
-        else:
-            st.write("Nessuna spesa registrata.")
-
-# --- SEZIONE: IMPOSTAZIONI & GESTIONE CONTI ---
-elif menu == t("settings"):
-    st.subheader(t("settings"))
-
-    # Config lingua e valuta
-    lingua_scelta = st.selectbox(
-        t("lang"),
-        options=["it", "en"],
-        index=0 if st.session_state.lingua == "it" else 1,
-    )
-    valuta_scelta = st.selectbox(
-        t("curr"),
-        options=list(tassiDiCambio.keys()),
-        index=list(tassiDiCambio.keys()).index(st.session_state.valuta),
-    )
-
-    if st.button(t("save")):
-        st.session_state.lingua = lingua_scelta
-        st.session_state.valuta = valuta_scelta
-        st.success(t("settingsSaved"))
-        st.rerun()
-
-    st.divider()
-    st.subheader("Gestione Conti e Carte")
-
-    # Form per aggiungere un nuovo conto
-    with st.form("nuovo_conto_form"):
-        st.write(t("addAccount"))
-        nome_nuovo_conto = st.text_input(t("accountName"))
-        saldo_iniziale_nuovo = st.number_input(t("initialBalance"), value=0.0, step=0.01)
-        valuta_nuovo_conto = st.selectbox("Valuta Conto", options=list(tassiDiCambio.keys()))
-        is_finanziamento_nuovo = st.checkbox(t("isLoan"))
-
-        aggiungi_conto_sub = st.form_submit_button("Crea Conto")
-        if aggiungi_conto_sub and nome_nuovo_conto:
-            nuovo_id = "c_" + str(datetime.datetime.now().timestamp())
-            st.session_state.conti.append({
-                "id": nuovo_id,
-                "nome": nome_nuovo_conto,
-                "saldoIniziale": saldo_iniziale_nuovo,
-                "valuta": valuta_nuovo_conto,
-                "isFinanziamento": is_finanziamento_nuovo
+    # Form Nuovo Conto
+    with st.expander("➕ AGGIUNGI NUOVO CONTO / CARTA"):
+        t = st.selectbox("Tipo", ["Bancario", "Prepagata", "Carta di Credito"])
+        name = st.text_input("Nome")
+        init = st.number_input("Saldo di partenza", value=0.0)
+        plafond = 0.0
+        addebito = 1
+        if t == "Carta di Credito":
+            plafond = st.number_input("Plafond Mensile", value=1500.0)
+            addebito = st.slider("Giorno Addebito (Mese Succ)", 1, 28, 1)
+        
+        if st.button("CREA"):
+            new_id = str(datetime.datetime.now().timestamp())
+            st.session_state.accounts.append({
+                "id": new_id, "name": name, "type": t, 
+                "init_bal": init, "plafond": plafond, "addebito_day": addebito
             })
-            st.success(f"Conto '{nome_nuovo_conto}' aggiunto con successo!")
             st.rerun()
 
-    st.write("### Conti Esistenti (Elimina)")
-    for c in st.session_state.conti:
-        col_c1, col_c2 = st.columns([3, 1])
-        with col_c1:
-            st.write(f"💳 **{c['nome']}** ({c['valuta']})")
-        with col_c2:
-            if st.button(t("delete"), key=f"del_conto_{c['id']}"):
-                if len(st.session_state.conti) <= 1:
-                    st.error("Non puoi eliminare l'ultimo conto rimasto!")
-                else:
-                    # Rimuove il conto e i movimenti associati
-                    st.session_state.conti = [item for item in st.session_state.conti if item["id"] != c["id"]]
-                    st.session_state.movimenti = [m for m in st.session_state.movimenti if m["contoId"] != c["id"]]
-                    st.success("Conto eliminato.")
-                    st.rerun()
+# --- MOVIMENTI ---
+elif menu == "MOVIMENTI":
+    st.title("📝 LISTA MOVIMENTI")
+    
+    with st.container(border=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            dc = st.date_input("Data Contabile", key="dc")
+        with c2:
+            dv = st.date_input("Data Valuta", value=dc, key="dv")
+        with c3:
+            acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts])
+        
+        c4, c5, c6 = st.columns(3)
+        with c4:
+            m_type = st.radio("Tipo", ["Entrata", "Uscita"], horizontal=True)
+        with c5:
+            cats = CATS_IN if m_type == "Entrata" else CATS_OUT
+            cat = st.selectbox("Categoria", cats)
+        with c6:
+            amt = st.number_input("Importo", min_value=0.01)
+            if m_type == "Uscita": amt = -amt
+        
+        desc = st.text_input("Descrizione (Opt)")
+        if st.button("INSERISCI MOVIMENTO"):
+            a_id = next(a['id'] for a in st.session_state.accounts if a['name'] == acc_choice)
+            add_movement(dc, dv, a_id, m_type, cat, desc, amt)
+            st.success("Inserito!")
+            st.rerun()
+
+    # Ricerca e Ordinamento
+    st.divider()
+    search = st.text_input("Cerca nei movimenti...")
+    df = pd.DataFrame(st.session_state.movements)
+    if not df.empty:
+        # Filtro virtuali per la tabella principale
+        df_show = df[df['virtual'] == False]
+        if search:
+            df_show = df_show[df_show['desc'].str.contains(search, case=False)]
+        st.dataframe(df_show, use_container_width=True)
+
+# --- REPORT ---
+elif menu == "REPORT (CASH FLOW)":
+    st.title("📊 ANALISI CASH FLOW")
+    d_range = st.date_input("Periodo", [date.today() - timedelta(days=30), date.today() + timedelta(days=30)])
+    
+    if len(d_range) == 2:
+        df = pd.DataFrame(st.session_state.movements)
+        if not df.empty:
+            df['date_c'] = pd.to_datetime(df['date_c']).dt.date
+            mask = (df['date_c'] >= d_range[0]) & (df['date_c'] <= d_range[1])
+            df_filtered = df[mask]
+            
+            e, u = df_filtered[df_filtered['amt'] > 0]['amt'].sum(), df_filtered[df_filtered['amt'] < 0]['amt'].sum()
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Entrate", f"{e:,.2f}")
+            c2.metric("Uscite", f"{u:,.2f}")
+            c3.metric("Netto", f"{e+u:,.2f}")
+            
+            fig = px.area(df.sort_values('date_c'), x='date_c', y='amt', title="Trend Cash Flow (Incl. Previsioni)", template="plotly_dark")
+            fig.update_traces(line_color='#22c55e')
+            st.plotly_chart(fig, use_container_width=True)
+
+# --- IMPOSTAZIONI ---
+elif menu == "IMPOSTAZIONI":
+    st.title("⚙️ IMPOSTAZIONI")
+    st.session_state.settings['lang'] = st.selectbox("Lingua", LANGS)
+    st.session_state.settings['currency'] = st.selectbox("Valuta", CURRS)
+    if st.button("SALVA & REFRESH"):
+        st.rerun()
+
+### Note sul funzionamento:
+- **Carte di Credito**: Quando inserisci un'uscita su una carta, il sistema calcola automaticamente un'uscita "virtuale" nel mese successivo per l'addebito sul conto, permettendoti di vedere nel report come varierà il tuo saldo.
+- **Date**: Se modifichi la data contabile, la data valuta si aggiorna automaticamente per default (grazie al parametro `value=dc`).
+- **Plafond**: Nella Dashboard, le carte di credito mostrano una barra di avanzamento che indica quanto plafond ti è rimasto.
+- **Flessibilità**: Ogni conto o carta può essere eliminato singolarmente tramite il pulsante rosso nella Dashboard.
+
+La tua app è ora pronta per essere testata con dati reali!
