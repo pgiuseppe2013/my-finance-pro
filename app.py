@@ -44,7 +44,7 @@ CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
 CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
 CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
-# 3. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF (Taglio storico)
+# 3. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF
 def get_account_balance(acc):
     acc_id = acc['id']
     init_bal = acc['init_bal']
@@ -82,7 +82,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
         "desc": desc, "amt": amt, "virtual": False
     })
 
-# 5. WIDGET MOVIMENTO DIETRO "+"
+# 5. WIDGET MOVIMENTO DIETRO "+" CON SINCRONIZZAZIONE DATE UNIDIREZIONALE
 def render_movement_form(key_suffix=""):
     with st.expander("➕ Aggiungi Nuovo Movimento"):
         if not st.session_state.accounts:
@@ -91,15 +91,25 @@ def render_movement_form(key_suffix=""):
 
         dc_key = f"dc_input_{key_suffix}"
         dv_key = f"dv_input_{key_suffix}"
+        last_dc_key = f"last_dc_{key_suffix}"
         
+        # Inizializzazione date nello stato se non esistono
         if dc_key not in st.session_state:
             st.session_state[dc_key] = date.today()
         if dv_key not in st.session_state:
             st.session_state[dv_key] = date.today()
+        if last_dc_key not in st.session_state:
+            st.session_state[last_dc_key] = st.session_state[dc_key]
 
         col1, col2, col3 = st.columns(3)
         with col1:
             dc = st.date_input("Data Contabile", key=dc_key)
+            
+        # Logica di sincronizzazione: se la data contabile è cambiata rispetto all'ultimo controllo, aggiorna la valuta
+        if dc != st.session_state[last_dc_key]:
+            st.session_state[dv_key] = dc
+            st.session_state[last_dc_key] = dc
+
         with col2:
             dv = st.date_input("Data Valuta", key=dv_key)
         with col3:
