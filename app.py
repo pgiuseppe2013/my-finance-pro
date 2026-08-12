@@ -471,7 +471,7 @@ elif menu == "MOVIMENTI":
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
         st.dataframe(df_show, use_container_width=True)
 
-# --- REPORT & CASH FLOW (FORZATURA SALDO INIZIALE BANCA NEL GRAFICO) ---
+# --- REPORT & CASH FLOW (LOGICA DEFINITIVA STOCK + FLUSSI PERMANENTI) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
@@ -482,7 +482,7 @@ elif menu == "REPORT":
     if len(d_range) == 2:
         df = pd.DataFrame(st.session_state.movements)
         
-        # 1. Iniettiamo sempre i saldi di partenza dei conti come righe di base indipendenti
+        # 1. Creiamo le righe di stock iniziale per ogni conto (posizionate esattamente alla loro data di inizio)
         base_rows = []
         for acc in st.session_state.accounts:
             if acc['type'] != "Carta di Credito":
@@ -508,15 +508,14 @@ elif menu == "REPORT":
             
         if not df_combined.empty:
             df_combined['date_c'] = pd.to_datetime(df_combined['date_c']).dt.date
+            
+            # 2. Ordiniamo tutto rigorosamente in ordine cronologico dall'inizio dei tempi
             df_sorted = df_combined.sort_values('date_c').copy()
             
-            # 2. Il cumulativo accumula rigorosamente partendo dal saldo banca iniziale
+            # 3. Il cumulativo accumula la somma algebrica da sinistra a destra (dal saldo iniziale in poi per sempre)
             df_sorted['cumulative_flow'] = df_sorted['amt'].cumsum()
             
-            # 3. Filtriamo per il grafico tenendo tutto fino alla fine del periodo selezionato
-            df_for_chart = df_sorted[df_sorted['date_c'] <= d_range[1]]
-            
-            # 4. Filtriamo specificamente per il periodo selezionato per calcolare le metriche (entrate/uscite)
+            # 4. Metriche calcolate ESCLUSIVAMENTE sul periodo selezionato dall'utente (es. dal 12 agosto al 12 agosto)
             mask_period = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
             df_filtered_period = df_sorted[mask_period]
             df_period_movements = df_filtered_period[df_filtered_period['type'] != "Saldo Iniziale"]
@@ -529,7 +528,9 @@ elif menu == "REPORT":
             c2.metric(t("tot_uscite"), f"{u:,.2f}")
             c3.metric(t("flusso_netto"), f"{e+u:,.2f}")
             
-            # Disegno del grafico d'area con il patrimonio reale comprensivo di banca
+            # 5. Il grafico mostra l'evoluzione del patrimonio includendo la history completa fino alla fine del range scelto
+            df_for_chart = df_sorted[df_sorted['date_c'] <= d_range[1]]
+            
             fig = px.area(df_for_chart, x='date_c', y='cumulative_flow', title=t("trend_cf"), template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
             fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
@@ -610,3 +611,4 @@ elif menu == "IMPOSTAZIONI":
             st.session_state.settings['currency'] = selected_curr
             st.success(t("succ_set"))
             st.rerun()
+            
