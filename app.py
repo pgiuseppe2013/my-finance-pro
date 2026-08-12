@@ -44,7 +44,22 @@ CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
 CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
 CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
-# 3. FUNZIONI LOGICHE SMART CON GESTIONE CARTA CORRETTA
+# 3. FUNZIONE LOGICA CALCOLO SALDO CON DATA DI CUT-OFF (Taglio storico)
+def get_account_balance(acc):
+    acc_id = acc['id']
+    init_bal = acc['init_bal']
+    init_date = acc.get('init_date', date.min)
+    
+    # Filtriamo solo i movimenti reali (non virtuali) del conto
+    # e prendiamo solo quelli con data >= alla data del saldo iniziale
+    valid_movements = [
+        m for m in st.session_state.movements 
+        if m['acc_id'] == acc_id and not m.get('virtual') and pd.to_datetime(m['date_c']).date() >= init_date
+    ]
+    
+    return init_bal + sum(m['amt'] for m in valid_movements)
+
+# 4. FUNZIONE AGGIUNTA MOVIMENTO
 def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
     acc = next((a for a in st.session_state.accounts if a['id'] == acc_id), None)
     
@@ -69,7 +84,7 @@ def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
         "desc": desc, "amt": amt, "virtual": False
     })
 
-# 4. FUNZIONE WIDGET UNIFICATO NASCOSTO DIETRO UN "+" (Expander)
+# 5. FUNZIONE WIDGET UNIFICATO NASCOSTO DIETRO UN "+" (Expander)
 def render_movement_form(key_suffix=""):
     with st.expander("➕ Aggiungi Nuovo Movimento"):
         if not st.session_state.accounts:
@@ -110,7 +125,7 @@ def render_movement_form(key_suffix=""):
             st.success("✅ Movimento registrato con successo!")
             st.rerun()
 
-# 5. BARRA DI NAVIGAZIONE A PULSANTI
+# 6. BARRA DI NAVIGAZIONE A PULSANTI
 st.title("⚡ MY FINANCE PRO")
 b1, b2, b3, b4 = st.columns(4)
 with b1:
@@ -125,22 +140,24 @@ with b4:
 st.divider()
 menu = st.session_state.active_tab
 
-# --- DASHBOARD (Solo qui si inseriscono i Conti/Carte) ---
+# --- DASHBOARD ---
 if menu == "DASHBOARD":
     st.subheader("Panoramica Patrimoniale e Conti")
     
-    total_cash = sum(a['init_bal'] + sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == a['id'] and not m.get('virtual')) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
+    # Calcolo liquidità totale escludendo le carte di credito e applicando la regola del saldo iniziale
+    total_cash = sum(get_account_balance(a) for a in st.session_state.accounts if a['type'] != "Carta di Credito")
     st.metric("LIQUIDITÀ TOTALE", f"{total_cash:,.2f} {st.session_state.settings['currency']}")
 
     cols = st.columns(3)
     for i, acc in enumerate(st.session_state.accounts):
         with cols[i % 3]:
             with st.container(border=True):
-                bal = acc['init_bal'] + sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and not m.get('virtual'))
+                bal = get_account_balance(acc)
                 st.markdown(f"### {acc['name']}")
-                st.caption(f"Tipo: {acc['type']}")
+                st.caption(f"Tipo: {acc['type']} | Dal: {acc.get('init_date', date.today()).strftime('%d/%m/%Y') if acc['type'] != 'Carta di Credito' else 'N/D'}")
+                
                 if acc['type'] == "Carta di Credito":
-                    used = abs(sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and m['amt'] < 0))
+                    used = abs(sum(m['amt'] for m in st.session_state.movements if m['acc_id'] == acc['id'] and m['amt'] < 0 and not m.get('virtual')))
                     residuo = acc['plafond'] - used
                     st.metric("Residuo Plafond", f"{residuo:,.2f}")
                     st.caption(f"Scadenza: {acc.get('scadenza', 'N/D')}")
@@ -154,13 +171,14 @@ if menu == "DASHBOARD":
 
     st.divider()
 
-    # Inserimento Semplificato Unico per Conto o Carta (Disponibile SOLO nella Dashboard)
+    # Inserimento Semplificato Unico per Conto o Carta con Data Saldo Iniziale
     with st.container(border=True):
         st.subheader("➕ Aggiungi Nuovo Conto o Carta")
         t = st.selectbox("Tipo di Rapporto", ["Bancario", "Prepagata", "Carta di Credito"])
         name = st.text_input("Nome Conto / Carta", key="acc_name_dash")
         
         init = 0.0
+        init_date = date.today()
         plafond = 0.0
         addebito = 1
         scadenza = date.today() + timedelta(days=365)
@@ -174,7 +192,11 @@ if menu == "DASHBOARD":
             with col_p3:
                 addebito = st.slider("Giorno Addebito", 1, 28, 1, key="acc_add_dash")
         else:
-            init = st.number_input("Saldo di Partenza", value=0.0, step=100.0, key="acc_init_dash")
+            col_i1, col_i2 = st.columns(2)
+            with col_i1:
+                init = st.number_input("Saldo di Partenza", value=0.0, step=100.0, key="acc_init_dash")
+            with col_i2:
+                init_date = st.date_input("A che data hai questo saldo?", value=date.today(), key="acc_init_date_dash")
         
         if st.button("CREA CONTO / CARTA", key="btn_create_acc_dash"):
             if name.strip() == "":
@@ -183,7 +205,8 @@ if menu == "DASHBOARD":
                 new_id = str(datetime.datetime.now().timestamp())
                 st.session_state.accounts.append({
                     "id": new_id, "name": name, "type": t, 
-                    "init_bal": init, "plafond": plafond, "addebito_day": addebito,
+                    "init_bal": init, "init_date": init_date, 
+                    "plafond": plafond, "addebito_day": addebito,
                     "scadenza": scadenza.strftime("%d/%m/%Y") if t == "Carta di Credito" else ""
                 })
                 st.success("✅ Conto creato con successo!")
@@ -212,40 +235,56 @@ elif menu == "REPORT":
     d_range = st.date_input("Seleziona Periodo Analisi (Passato & Futuro)", [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
+        # Somma dei saldi iniziali di tutti i conti non carta
         initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
         
         df = pd.DataFrame(st.session_state.movements)
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
-            df_sorted = df.sort_values('date_c').copy()
-            df_sorted['cumulative_flow'] = initial_total_balance + df_sorted['amt'].cumsum()
             
-            mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
-            df_filtered = df_sorted[mask]
+            # Filtriamo i movimenti escludendo quelli precedenti alla data di saldo iniziale del rispettivo conto
+            valid_rows = []
+            for _, row in df.iterrows():
+                acc = next((a for a in st.session_state.accounts if a['id'] == row['acc_id']), None)
+                if acc and acc['type'] != "Carta di Credito":
+                    cutoff = acc.get('init_date', date.min)
+                    if row['date_c'] >= cutoff or row.get('virtual'):
+                        valid_rows.append(row)
+                else:
+                    valid_rows.append(row)
             
-            e = df_filtered[df_filtered['amt'] > 0]['amt'].sum()
-            u = df_filtered[df_filtered['amt'] < 0]['amt'].sum()
+            df_valid = pd.DataFrame(valid_rows) if valid_rows else pd.DataFrame(columns=df.columns)
             
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Totale Entrate", f"{e:,.2f}")
-            c2.metric("Totale Uscite", f"{u:,.2f}")
-            c3.metric("Flusso Netto Periodo", f"{e+u:,.2f}")
-            
-            fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale (Incl. Saldi Iniziali e Previsioni)", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
-            fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
-            st.plotly_chart(fig, use_container_width=True)
-            
-            st.markdown("### 🔍 Dettaglio Movimenti per Categoria")
-            filter_mode = st.radio("Fissa vista dettaglio:", ["Tutti", "Solo Entrate", "Solo Uscite"], horizontal=True, key="filter_mode")
-            
-            if filter_mode == "Solo Entrate":
-                df_detail = df_filtered[df_filtered['amt'] > 0]
-            elif filter_mode == "Solo Uscite":
-                df_detail = df_filtered[df_filtered['amt'] < 0]
-            else:
-                df_detail = df_filtered
+            if not df_valid.empty:
+                df_sorted = df_valid.sort_values('date_c').copy()
+                df_sorted['cumulative_flow'] = initial_total_balance + df_sorted['amt'].cumsum()
                 
-            st.dataframe(df_detail[['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
+                mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
+                df_filtered = df_sorted[mask]
+                
+                e = df_filtered[df_filtered['amt'] > 0]['amt'].sum()
+                u = df_filtered[df_filtered['amt'] < 0]['amt'].sum()
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Totale Entrate", f"{e:,.2f}")
+                c2.metric("Totale Uscite", f"{u:,.2f}")
+                c3.metric("Flusso Netto Periodo", f"{e+u:,.2f}")
+                
+                fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale (Taglio storico post-saldo iniziale)", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
+                fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("### 🔍 Dettaglio Movimenti per Categoria")
+                filter_mode = st.radio("Fissa vista dettaglio:", ["Tutti", "Solo Entrate", "Solo Uscite"], horizontal=True, key="filter_mode")
+                
+                if filter_mode == "Solo Entrate":
+                    df_detail = df_filtered[df_filtered['amt'] > 0]
+                elif filter_mode == "Solo Uscite":
+                    df_detail = df_filtered[df_filtered['amt'] < 0]
+                else:
+                    df_detail = df_filtered
+                    
+                st.dataframe(df_detail[['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
