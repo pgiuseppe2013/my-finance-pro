@@ -85,11 +85,8 @@ TRANSLATIONS = {
         "gest_mov": "Gestione e Modifica Movimenti",
         "analisi_cf": "Analisi Cash Flow e Dettagli",
         "sel_periodo": "Seleziona Periodo Analisi (Passato & Futuro)",
-        "tot_entrate": "Totale Entrate",
-        "tot_uscite": "Totale Uscite",
-        "flusso_netto": "Flusso Netto Periodo",
         "trend_cf": "Trend Cash Flow Patrimoniale (Incluso Saldo Iniziale Banca)",
-        "dett_cat": "🔍 Struttura Contabile Cash Flow per Macrovoci",
+        "dett_cat": "📊 Schema Cash Flow per Macrovoci",
         "vista_dett": "Fissa vista dettaglio:",
         "tutti": "Tutti",
         "solo_ent": "Solo Entrate",
@@ -146,11 +143,8 @@ TRANSLATIONS = {
         "gest_mov": "Transactions Management & Editing",
         "analisi_cf": "Cash Flow Analysis & Details",
         "sel_periodo": "Select Analysis Period (Passato & Futuro)",
-        "tot_entrate": "Total Income",
-        "tot_uscite": "Total Expenses",
-        "flusso_netto": "Net Period Flow",
         "trend_cf": "Patrimonial Cash Flow Trend (Incl. Bank Initial Balance)",
-        "dett_cat": "🔍 Cash Flow Macro-Categories Statement",
+        "dett_cat": "📊 Cash Flow Macro-Categories Scheme",
         "vista_dett": "Filter detail view:",
         "tutti": "All",
         "solo_ent": "Only Income",
@@ -207,11 +201,8 @@ TRANSLATIONS = {
         "gest_mov": "Gestion et Modification",
         "analisi_cf": "Analyse du Flux & Détails",
         "sel_periodo": "Sélectionner la Période (Passé & Futur)",
-        "tot_entrate": "Total Revenus",
-        "tot_uscite": "Total Dépenses",
-        "flusso_netto": "Flux Net de la Période",
         "trend_cf": "Tendance du Flux (Solde Initial de Banque Inclus)",
-        "dett_cat": "🔍 État des Flux par Macro-Catégories",
+        "dett_cat": "📊 Schéma des Flux par Macro-Catégories",
         "vista_dett": "Filtrer la vue:",
         "tutti": "Tous",
         "solo_ent": "Seulement Revenus",
@@ -518,10 +509,11 @@ elif menu == "MOVIMENTI":
     else:
         st.info("Nessun movimento registrato.")
 
-# --- REPORT & CASH FLOW (STRUTTURA MACROVOCI POPOLATE E NON) ---
+# --- REPORT & CASH FLOW (SCHEMA PURO CON CONSUNTIVO EFFETTIVO) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
-    render_movement_form(key_suffix="rep_tab")
+    
+    # RIMOSSO COMPLETAMENTE render_movement_form da qui (niente inserimento movimenti nella dash del cash flow)
 
     st.divider()
     d_range = st.date_input(t("sel_periodo"), [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
@@ -564,13 +556,22 @@ elif menu == "REPORT":
             df_filtered_period = df_sorted[mask_period]
             df_period_movements = df_filtered_period[df_filtered_period['type'] != "Saldo Iniziale"]
             
-            e = df_period_movements[df_period_movements['amt'] > 0]['amt'].sum()
-            u = df_period_movements[df_period_movements['amt'] < 0]['amt'].sum()
+            # Distinzione tra movimenti schedulati (futuri/tutti) ed effettivamente REALIZZATI (fino ad oggi)
+            today_date = date.today()
+            df_realized = df_period_movements[pd.to_datetime(df_period_movements['date_c']).dt.date <= today_date]
             
-            c1, c2, c3 = st.columns(3)
-            c1.metric(t("tot_entrate"), f"{e:,.2f}")
-            c2.metric(t("tot_uscite"), f"{u:,.2f}")
-            c3.metric(t("flusso_netto"), f"{e+u:,.2f}")
+            e_real = df_realized[df_realized['amt'] > 0]['amt'].sum()
+            u_real = df_realized[df_realized['amt'] < 0]['amt'].sum()
+            net_real = e_real + u_real
+            
+            # --- SEZIONE CONSUNTIVO EFFETTIVO ---
+            st.markdown("### 📌 Resoconto di quanto effettivamente realizzato (Consuntivo ad oggi)")
+            rc1, rc2, rc3 = st.columns(3)
+            rc1.metric("Entrate Realizzate", f"{e_real:,.2f}")
+            rc2.metric("Uscite Realizzate", f"{u_real:,.2f}")
+            rc3.metric("Flusso Netto Realizzato", f"{net_real:,.2f}")
+            
+            st.divider()
             
             df_for_chart = df_sorted[df_sorted['date_c'] <= d_range[1]]
             
@@ -578,34 +579,30 @@ elif menu == "REPORT":
             fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
             
-            # --- TABELLA STRUTTURA MACROVOCI (POPOLATE E A ZERO) ---
+            # --- SCHEMA CASH FLOW PURO (SENZA TOTALI DI RIGA ESTERNI) ---
             st.markdown(f"### {t('dett_cat')}")
             
-            # Calcoliamo i totali per ogni singola categoria esistente (sia IN che OUT)
             summary_data = []
             
-            # Aggiungiamo Saldo Banca Iniziale come prima macrovoce di struttura
+            # Riga del Saldo (Differenziata graficamente con etichetta dedicata)
             summary_data.append({
-                "Flusso / Categoria": "➕ Saldo Iniziale Banca (Stock)",
-                "Tipo": "Capitale",
+                "Schema Cash Flow (Macrovoci)": "+/- SALDO INIZIALE BANCA (Stock)",
                 "Importo": init_bank_total
             })
             
-            # Entrate (Mostriamo tutte quelle configurate, anche a 0)
+            # Entrate
             for cat_in in st.session_state.cats_in:
                 cat_sum = df_period_movements[(df_period_movements['cat'] == cat_in) & (df_period_movements['amt'] > 0)]['amt'].sum()
                 summary_data.append({
-                    "Flusso / Categoria": f"+ {cat_in}",
-                    "Tipo": "Entrata",
+                    "Schema Cash Flow (Macrovoci)": f"+ {cat_in}",
                     "Importo": cat_sum
                 })
                 
-            # Uscite (Mostriamo tutte quelle configurate, anche a 0)
+            # Uscite
             for cat_out in st.session_state.cats_out:
                 cat_sum = df_period_movements[(df_period_movements['cat'] == cat_out) & (df_period_movements['amt'] < 0)]['amt'].sum()
                 summary_data.append({
-                    "Flusso / Categoria": f"- {cat_out}",
-                    "Tipo": "Uscita",
+                    "Schema Cash Flow (Macrovoci)": f"- {cat_out}",
                     "Importo": cat_sum
                 })
                 
@@ -613,12 +610,13 @@ elif menu == "REPORT":
             
             filter_mode = st.radio(t("vista_dett"), [t("tutti"), t("solo_ent"), t("solo_usc")], horizontal=True, key="filter_mode")
             if filter_mode == t("solo_ent"):
-                df_summary_show = df_summary[df_summary['Tipo'].isin(["Capitale", "Entrata"])]
+                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\+", case=False, regex=True)]
             elif filter_mode == t("solo_usc"):
-                df_summary_show = df_summary[df_summary['Tipo'].isin(["Capitale", "Uscita"])]
+                df_summary_show = df_summary[df_summary['Schema Cash Flow (Macrovoci)'].str.contains("SALDO|\\-", case=False, regex=True)]
             else:
                 df_summary_show = df_summary
                 
+            # Visualizzazione pulita del solo schema senza totali calcolati in fondo alla tabella
             st.dataframe(df_summary_show, use_container_width=True, hide_index=True)
 
 # --- IMPOSTAZIONI ---
