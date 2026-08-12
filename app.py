@@ -186,10 +186,3 @@ elif menu == "IMPOSTAZIONI":
     if st.button("SALVA & REFRESH"):
         st.rerun()
 
-### Note sul funzionamento:
-- **Carte di Credito**: Quando inserisci un'uscita su una carta, il sistema calcola automaticamente un'uscita "virtuale" nel mese successivo per l'addebito sul conto, permettendoti di vedere nel report come varierà il tuo saldo.
-- **Date**: Se modifichi la data contabile, la data valuta si aggiorna automaticamente per default (grazie al parametro `value=dc`).
-- **Plafond**: Nella Dashboard, le carte di credito mostrano una barra di avanzamento che indica quanto plafond ti è rimasto.
-- **Flessibilità**: Ogni conto o carta può essere eliminato singolarmente tramite il pulsante rosso nella Dashboard.
-
-La tua app è ora pronta per essere testata con dati reali!
