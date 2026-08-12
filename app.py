@@ -145,7 +145,7 @@ TRANSLATIONS = {
         "search_mov": "🔍 Search transactions...",
         "gest_mov": "Transactions Management",
         "analisi_cf": "Cash Flow Analysis & Details",
-        "sel_periodo": "Select Analysis Period (Past & Future)",
+        "sel_periodo": "Select Analysis Period (Passato & Futuro)",
         "tot_entrate": "Total Income",
         "tot_uscite": "Total Expenses",
         "flusso_netto": "Net Period Flow",
@@ -471,7 +471,7 @@ elif menu == "MOVIMENTI":
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
         st.dataframe(df_show, use_container_width=True)
 
-# --- REPORT & CASH FLOW (INCORPORA SALDO INIZIALE BANCA NEL GRAFICO) ---
+# --- REPORT & CASH FLOW (FORZATURA SALDO INIZIALE BANCA NEL GRAFICO) ---
 elif menu == "REPORT":
     st.subheader(t("analisi_cf"))
     render_movement_form(key_suffix="rep_tab")
@@ -480,15 +480,12 @@ elif menu == "REPORT":
     d_range = st.date_input(t("sel_periodo"), [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
-        # Somma di TUTTI i saldi iniziali dei conti non carta di credito (Banca, Prepagate, ecc.)
-        initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
-        
         df = pd.DataFrame(st.session_state.movements)
         
-        # Creiamo un punto fittizio iniziale per il saldo banca se ci sono conti registrati
+        # 1. Iniettiamo sempre i saldi di partenza dei conti come righe di base indipendenti
         base_rows = []
         for acc in st.session_state.accounts:
-            if acc['type'] != "Carta di Credito" and acc.get('init_bal', 0) != 0:
+            if acc['type'] != "Carta di Credito":
                 base_rows.append({
                     "id": f"init_bank_{acc['id']}",
                     "date_c": acc.get('init_date', d_range[0]),
@@ -496,12 +493,12 @@ elif menu == "REPORT":
                     "acc_id": acc['id'],
                     "type": "Saldo Iniziale",
                     "cat": "Capitale Iniziale",
-                    "desc": f"Saldo di partenza conto: {acc['name']}",
-                    "amt": acc['init_bal'],
+                    "desc": f"Saldo iniziale conto: {acc['name']}",
+                    "amt": acc.get('init_bal', 0.0),
                     "virtual": False
                 })
         
-        df_base = pd.DataFrame(base_rows) if base_rows else pd.DataFrame(columns=df.columns if not df.empty else ['id', 'date_c', 'date_v', 'acc_id', 'type', 'cat', 'desc', 'amt', 'virtual'])
+        df_base = pd.DataFrame(base_rows) if base_rows else pd.DataFrame(columns=['id', 'date_c', 'date_v', 'acc_id', 'type', 'cat', 'desc', 'amt', 'virtual'])
         
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
@@ -513,15 +510,16 @@ elif menu == "REPORT":
             df_combined['date_c'] = pd.to_datetime(df_combined['date_c']).dt.date
             df_sorted = df_combined.sort_values('date_c').copy()
             
-            # Il cumulativo parte direttamente accumulando dal primo giorno cronologico dei movimenti/saldi
+            # 2. Il cumulativo accumula rigorosamente partendo dal saldo banca iniziale
             df_sorted['cumulative_flow'] = df_sorted['amt'].cumsum()
             
-            # Filtraggio sul range temporale scelto dall'utente per il grafico e metriche del periodo
-            mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
-            df_filtered = df_sorted[mask]
+            # 3. Filtriamo per il grafico tenendo tutto fino alla fine del periodo selezionato
+            df_for_chart = df_sorted[df_sorted['date_c'] <= d_range[1]]
             
-            # Escludiamo i record di saldo iniziale dal calcolo dei flussi di entrate/uscite del periodo
-            df_period_movements = df_filtered[df_filtered['type'] != "Saldo Iniziale"]
+            # 4. Filtriamo specificamente per il periodo selezionato per calcolare le metriche (entrate/uscite)
+            mask_period = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
+            df_filtered_period = df_sorted[mask_period]
+            df_period_movements = df_filtered_period[df_filtered_period['type'] != "Saldo Iniziale"]
             
             e = df_period_movements[df_period_movements['amt'] > 0]['amt'].sum()
             u = df_period_movements[df_period_movements['amt'] < 0]['amt'].sum()
@@ -531,7 +529,8 @@ elif menu == "REPORT":
             c2.metric(t("tot_uscite"), f"{u:,.2f}")
             c3.metric(t("flusso_netto"), f"{e+u:,.2f}")
             
-            fig = px.area(df_sorted[df_sorted['date_c'] <= d_range[1]], x='date_c', y='cumulative_flow', title=t("trend_cf"), template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
+            # Disegno del grafico d'area con il patrimonio reale comprensivo di banca
+            fig = px.area(df_for_chart, x='date_c', y='cumulative_flow', title=t("trend_cf"), template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
             fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
             
@@ -545,7 +544,7 @@ elif menu == "REPORT":
             else:
                 df_detail = df_period_movements
                 
-            st.dataframe(df_detail[df_detail['date_c'] >= d_range[0]][['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
+            st.dataframe(df_detail[['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
