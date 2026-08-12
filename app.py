@@ -44,17 +44,23 @@ CURRS = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"]
 CATS_IN = ["Stipendio", "Rendita", "Bonus", "Vendita", "Altro"]
 CATS_OUT = ["Affitto", "Mutuo", "Utenze", "Supermercato", "Shopping", "Trasporti", "Salute", "Svago"]
 
-# 3. FUNZIONI LOGICHE SMART
+# 3. FUNZIONI LOGICHE SMART CON GESTIONE CARTA CORRETTA
 def add_movement(m_date_c, m_date_v, acc_id, m_type, cat, desc, amt):
     acc = next((a for a in st.session_state.accounts if a['id'] == acc_id), None)
+    
+    # Se è una spesa con Carta di Credito, generiamo il movimento revisionale di addebito al mese successivo
     if acc and acc['type'] == "Carta di Credito" and amt < 0:
-        next_month = m_date_c.replace(day=1) + timedelta(days=32)
-        addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
+        try:
+            next_month = m_date_c.replace(day=1) + timedelta(days=32)
+            addebito_date = next_month.replace(day=acc.get('addebito_day', 1))
+        except ValueError:
+            addebito_date = m_date_c + timedelta(days=30)
+            
         st.session_state.movements.append({
             "id": f"PREV_{datetime.datetime.now().timestamp()}",
             "date_c": addebito_date, "date_v": addebito_date,
             "acc_id": acc_id, "type": "Uscita (Prev)", "cat": "Saldo Carta",
-            "desc": f"Addebito previsto: {desc}", "amt": amt, "virtual": True
+            "desc": f"Addebito carta: {desc}", "amt": amt, "virtual": True
         })
     
     st.session_state.movements.append({
@@ -78,9 +84,6 @@ with b4:
 
 st.divider()
 menu = st.session_state.active_tab
-
-# Formato data dinamico in base alla lingua
-date_format_str = "DD/MM/YYYY" if st.session_state.settings['lang'] == "IT" else "YYYY/MM/DD"
 
 # --- DASHBOARD ---
 if menu == "DASHBOARD":
@@ -173,7 +176,6 @@ elif menu == "MOVIMENTI":
         st.warning("Crea prima almeno un conto o una carta dalla Dashboard!")
     else:
         with st.container(border=True):
-            # Gestione automatica data contabile -> valuta
             if 'last_dc' not in st.session_state:
                 st.session_state.last_dc = date.today()
             if 'last_dv' not in st.session_state:
@@ -183,13 +185,12 @@ elif menu == "MOVIMENTI":
             with c1:
                 dc = st.date_input("Data Contabile", key="dc_main")
             with c2:
-                # Se la data contabile è cambiata rispetto all'ultimo giro, aggiorna anche la valuta
                 if dc != st.session_state.last_dc:
                     st.session_state.last_dv = dc
                     st.session_state.last_dc = dc
                 dv = st.date_input("Data Valuta", value=st.session_state.last_dv, key="dv_main")
                 if dv != st.session_state.last_dv:
-                    st.session_state.last_dv = dv # Aggiorna se modificata manualmente a parte
+                    st.session_state.last_dv = dv
             with c3:
                 acc_choice = st.selectbox("Conto", [a['name'] for a in st.session_state.accounts], key="acc_main")
             
@@ -219,18 +220,25 @@ elif menu == "MOVIMENTI":
             df_show = df_show[df_show['desc'].str.contains(search, case=False)]
         st.dataframe(df_show, use_container_width=True)
 
-# --- REPORT ---
+# --- REPORT (CASH FLOW COMPLETO CON SALDI INIZIALI E PREVISIONI) ---
 elif menu == "REPORT":
     st.subheader("Analisi Cash Flow e Dettagli")
-    # Range esteso nel passato e nel futuro (speculare)
     d_range = st.date_input("Seleziona Periodo Analisi", [date.today() - timedelta(days=90), date.today() + timedelta(days=90)], key="report_range")
     
     if len(d_range) == 2:
+        # Calcoliamo il saldo patrimoniale iniziale totale dei conti non carta
+        initial_total_balance = sum(a['init_bal'] for a in st.session_state.accounts if a['type'] != "Carta di Credito")
+        
         df = pd.DataFrame(st.session_state.movements)
         if not df.empty:
             df['date_c'] = pd.to_datetime(df['date_c']).dt.date
-            mask = (df['date_c'] >= d_range[0]) & (df['date_c'] <= d_range[1])
-            df_filtered = df[mask & (df['virtual'] == False)]
+            
+            # Ordiniamo per data per calcolare l'andamento progressivo (Cash Flow cumulata)
+            df_sorted = df.sort_values('date_c').copy()
+            df_sorted['cumulative_flow'] = initial_total_balance + df_sorted['amt'].cumsum()
+            
+            mask = (df_sorted['date_c'] >= d_range[0]) & (df_sorted['date_c'] <= d_range[1])
+            df_filtered = df_sorted[mask]
             
             e = df_filtered[df_filtered['amt'] > 0]['amt'].sum()
             u = df_filtered[df_filtered['amt'] < 0]['amt'].sum()
@@ -238,10 +246,11 @@ elif menu == "REPORT":
             c1, c2, c3 = st.columns(3)
             c1.metric("Totale Entrate", f"{e:,.2f}")
             c2.metric("Totale Uscite", f"{u:,.2f}")
-            c3.metric("Flusso Netto", f"{e+u:,.2f}")
+            c3.metric("Flusso Netto Periodo", f"{e+u:,.2f}")
             
-            fig = px.area(df.sort_values('date_c'), x='date_c', y='amt', title="Trend Cash Flow (Passato & Futuro Previsto)", template="plotly_dark")
-            fig.update_traces(line_color='#22c55e')
+            # Grafico del Cash Flow basato sulla liquidità complessiva comprensiva dei saldi bancari
+            fig = px.area(df_filtered, x='date_c', y='cumulative_flow', title="Trend Cash Flow Patrimoniale (Incl. Saldi Iniziali e Previsioni)", template="plotly_dark", labels={'cumulative_flow': 'Patrimonio Totale', 'date_c': 'Data'})
+            fig.update_traces(line_color='#22c55e', fillcolor='rgba(34, 197, 94, 0.2)')
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("### 🔍 Dettaglio Movimenti per Categoria")
@@ -254,7 +263,7 @@ elif menu == "REPORT":
             else:
                 df_detail = df_filtered
                 
-            st.dataframe(df_detail, use_container_width=True)
+            st.dataframe(df_detail[['date_c', 'date_v', 'type', 'cat', 'desc', 'amt']], use_container_width=True)
 
 # --- IMPOSTAZIONI ---
 elif menu == "IMPOSTAZIONI":
