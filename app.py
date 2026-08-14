@@ -40,21 +40,46 @@ def t(key):
     lang = st.session_state.settings["lang"]
     return TRANSLATIONS.get(lang, TRANSLATIONS["EN"]).get(key, key)
 
-# --- AUTENTICAZIONE ---
+# --- AUTENTICAZIONE & PRIVACY ---
 if not st.session_state.logged_user:
     st.title("🔐 Login / Registrazione")
+    
+    # Sezione Informativa Privacy e T&C visibile in fase di accesso
+    with st.expander("📄 Termini e Condizioni & Informativa sulla Privacy"):
+        st.markdown("""
+        **Informativa sulla Privacy e Termini di Servizio:**
+        * I dati inseriti sono gestiti nel rispetto della privacy e memorizzati temporaneamente nella sessione.
+        * Nessun dato finanziario personale viene condiviso con terze parti o memorizzato su database esterni persistenti in questa versione demo.
+        * Utilizzando l'applicazione, accetti i termini di utilizzo di base per la gestione amatoriale della finanza personale.
+        """)
+        
     col1, col2 = st.columns(2)
     with col1:
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
+        st.subheader("Accedi")
+        u_log = st.text_input("Username", key="log_u")
+        p_log = st.text_input("Password", type="password", key="log_p")
         if st.button("Accedi"):
-            user = next((x for x in st.session_state.users if x['u'] == u and x['p'] == p), None)
-            if user: st.session_state.logged_user = u; st.rerun()
-            else: st.error("Credenziali errate")
+            user = next((x for x in st.session_state.users if x['u'] == u_log and x['p'] == p_log), None)
+            if user: 
+                st.session_state.logged_user = u_log
+                st.rerun()
+            else: 
+                st.error("Credenziali errate")
+                
     with col2:
+        st.subheader("Registrati")
+        u_reg = st.text_input("Username", key="reg_u")
+        p_reg = st.text_input("Password", type="password", key="reg_p")
+        accept_tc = st.checkbox("Accetto i Termini e Condizioni e la Privacy Policy")
+        
         if st.button("Registrati"):
-            st.session_state.users.append({'u': u, 'p': p})
-            st.success("Registrato!")
+            if not accept_tc:
+                st.error("Devi accettare i Termini e Condizioni per registrarti.")
+            elif not u_reg or not p_reg:
+                st.error("Inserisci username e password validi.")
+            else:
+                st.session_state.users.append({'u': u_reg, 'p': p_reg})
+                st.success("Registrazione completata! Ora puoi effettuare il login a sinistra.")
     st.stop()
 
 # --- LOGICA APPLICATIVA ---
@@ -75,30 +100,42 @@ if tab4.button(t("set")): st.session_state.active_tab = "IMPOSTAZIONI"
 # --- LOGICA VIEW ---
 if st.session_state.active_tab == "DASHBOARD":
     st.subheader("Panoramica Patrimoniale")
-    # Calcolo saldi dinamico
     total_bal = sum(a['init_bal'] for a in user_accounts if a['type'] != "Carta di Credito")
     total_bal += sum(m['amt'] for m in user_movements if not m.get('virtual'))
     st.metric(t("tot_liq"), f"{total_bal:,.2f} {st.session_state.settings['currency']}")
     
-    # Form Aggiunta Conto
     with st.expander("➕ Aggiungi Conto"):
         name = st.text_input("Nome Conto")
         tipo = st.selectbox("Tipo", ["Bancario", "Prepagata", "Carta di Credito"])
         if st.button("Salva Conto"):
-            st.session_state.accounts.append({'user': st.session_state.logged_user, 'id': len(st.session_state.accounts), 'name': name, 'type': tipo, 'init_bal': 0.0})
+            st.session_state.accounts.append({
+                'user': st.session_state.logged_user, 
+                'id': len(st.session_state.accounts), 
+                'name': name, 
+                'type': tipo, 
+                'init_bal': 0.0
+            })
             st.rerun()
 
 elif st.session_state.active_tab == "MOVIMENTI":
     st.subheader("Registra Operazione")
-    col1, col2, col3 = st.columns(3)
-    date_c = col1.date_input("Data")
-    acc = col2.selectbox("Conto", [a['name'] for a in user_accounts])
-    amt = col3.number_input("Importo", step=0.01)
-    if st.button("Registra"):
-        st.session_state.movements.append({'user': st.session_state.logged_user, 'date_c': date_c, 'acc': acc, 'amt': amt, 'virtual': False})
-        st.rerun()
+    if not user_accounts:
+        st.warning("Crea prima almeno un conto nella Dashboard.")
+    else:
+        col1, col2, col3 = st.columns(3)
+        date_c = col1.date_input("Data")
+        acc = col2.selectbox("Conto", [a['name'] for a in user_accounts])
+        amt = col3.number_input("Importo", step=0.01)
+        if st.button("Registra"):
+            st.session_state.movements.append({
+                'user': st.session_state.logged_user, 
+                'date_c': date_c, 
+                'acc': acc, 
+                'amt': amt, 
+                'virtual': False
+            })
+            st.rerun()
 
-    # Tabella Movimenti
     if user_movements:
         df = pd.DataFrame(user_movements)
         st.dataframe(df, use_container_width=True)
@@ -114,7 +151,17 @@ elif st.session_state.active_tab == "REPORT":
 
 elif st.session_state.active_tab == "IMPOSTAZIONI":
     st.subheader(t("set"))
-    st.session_state.settings['lang'] = st.selectbox("Lingua", ["IT", "EN"], index=["IT", "EN"].index(st.session_state.settings['lang']))
+    st.session_state.settings['lang'] = st.selectbox(
+        "Lingua", ["IT", "EN"], 
+        index=["IT", "EN"].index(st.session_state.settings['lang'])
+    )
+    
+    with st.expander("📄 Termini e Condizioni & Privacy Policy"):
+        st.markdown("""
+        **Informativa sulla Privacy (Dettagli):**
+        I dati trattati risiedono unicamente nella sessione corrente dell'applicazione. Puoi consultare in qualsiasi momento le specifiche di utilizzo.
+        """)
+        
     if st.button("Logout"):
         st.session_state.logged_user = None
         st.rerun()
