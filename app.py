@@ -7,7 +7,7 @@ import plotly.express as px
 # 1. CONFIGURAZIONE PAGINA
 st.set_page_config(page_title="MY FINANCE PRO", page_icon="⚡", layout="wide")
 
-# 2. INIZIALIZZAZIONE STATO (Eseguita subito dopo le importazioni)
+# 2. INIZIALIZZAZIONE STATO
 def init_state():
     defaults = {
         'users': [], 'logged_user': None, 'accounts': [], 'movements': [],
@@ -20,20 +20,33 @@ def init_state():
 
 init_state()
 
-# 3. FUNZIONI DI SUPPORTO
+# 3. TESTI LEGALI DETTAGLIATI E PROFESSIONALI
 def show_legal_texts():
-    st.markdown("### 📜 Termini e Condizioni")
-    st.write("1. **Utilizzo**: L'applicazione è fornita a scopo dimostrativo.")
-    st.write("2. **Responsabilità**: L'utente è responsabile dei dati inseriti.")
-    st.markdown("### 🛡️ Informativa sulla Privacy")
-    st.write("- **Memorizzazione**: I dati risiedono solo nella sessione temporanea del browser.")
-    st.write("- **Nessun Tracciamento**: Non vengono inviati dati a server esterni.")
+    st.markdown("### 📜 Termini e Condizioni di Utilizzo")
+    st.markdown("""
+    1. **Natura del Servizio**: *MY FINANCE PRO* è un software di gestione finanziaria personale fornito "così com'è" (*as is*), a solo scopo dimostrativo, informativo ed educativo. Non costituisce in alcun modo una consulenza finanziaria, fiscale o di investimento professionale.
+    2. **Limitazione di Responsabilità**: L'autore e gli sviluppatori declinano ogni responsabilità per eventuali perdite economiche, errori di calcolo, omissioni o danni derivanti dall'uso diretto o indiretto dell'applicazione e delle informazioni in essa inserite.
+    3. **Accuratezza dei Dati**: L'utente è l'unico ed esclusivo responsabile dell'accuratezza, della sicurezza e della veridicità dei dati contabili e finanziari inseriti all'interno della piattaforma.
+    4. **Modifiche al Servizio**: L'autore si riserva il diritto di modificare, sospendere o interrompere, temporaneamente o permanentemente, l'applicazione in qualsiasi momento e senza preavviso.
+    """)
+    
+    st.markdown("### 🛡️ Informativa sulla Privacy (GDPR Compliance Preview)")
+    st.markdown("""
+    1. **Titolare del Trattamento**: I dati sono gestiti nell'ambito dell'utilizzo del software.
+    2. **Tipologia di Dati Raccolti**: 
+       * Dati di autenticazione (Username e credenziali d'accesso).
+       * Dati finanziari inseriti volontariamente (conti, importi, categorie, movimenti).
+    3. **Modalità e Luogo di Conservazione**: 
+       * I dati possono essere elaborati nella memoria di sessione temporanea del browser oppure memorizzati su infrastrutture di database sécurisées (es. servizi cloud come Supabase o analoghi, se configurati). 
+    4. **Finalità del Trattamento**: I dati inseriti vengono trattati esclusivamente al fine di erogare le funzionalità core dell'applicazione di bilancio personale. Nessun dato finanziario viene ceduto, venduto o condiviso con terze parti per scopi commerciali o di profilazione.
+    5. **Diritti dell'Utente**: L'utente può richiedere in qualsiasi momento la cancellazione del proprio account e dei dati associati azzerando le informazioni salvate.
+    """)
 
 # 4. LOGICA DI AUTENTICAZIONE
 if not st.session_state.logged_user:
     st.title("🔐 Login / Registrazione")
     
-    with st.expander("📄 Termini e Privacy"):
+    with st.expander("📄 Leggi Termini, Condizioni e Privacy Policy prima di procedere"):
         show_legal_texts()
         
     col1, col2 = st.columns(2)
@@ -52,26 +65,24 @@ if not st.session_state.logged_user:
         st.subheader("Registrati")
         u_reg = st.text_input("Nuovo Username")
         p_reg = st.text_input("Nuova Password", type="password")
-        accept = st.checkbox("Accetto i Termini e la Privacy Policy")
+        accept = st.checkbox("Dichiaro di aver letto, compreso e di accettare integralmente i Termini di Servizio e l'Informativa sulla Privacy.")
         if st.button("Registrati"):
             if accept:
                 st.session_state.users.append({'u': u_reg, 'p': p_reg})
-                st.success("Registrato con successo!")
+                st.success("Registrato con successo! Effettua il login a sinistra.")
             else:
-                st.warning("Devi accettare i termini per registrarti.")
+                st.warning("Devi obbligatoriamente accettare i Termini e la Privacy Policy per registrarti.")
     st.stop()
 
-# 5. INTERFACCIA PRINCIPALE (Se loggato)
+# 5. INTERFACCIA PRINCIPALE
 st.title("⚡ MY FINANCE PRO")
 
-# Menu di navigazione
 menu = st.columns(4)
 if menu[0].button("📊 DASHBOARD"): st.session_state.active_tab = "DASHBOARD"
 if menu[1].button("📝 MOVIMENTI"): st.session_state.active_tab = "MOVIMENTI"
 if menu[2].button("📈 REPORT"): st.session_state.active_tab = "REPORT"
 if menu[3].button("⚙️ IMPOSTAZIONI"): st.session_state.active_tab = "IMPOSTAZIONI"
 
-# Logica delle sezioni
 if st.session_state.active_tab == "DASHBOARD":
     st.subheader("Dashboard")
     st.metric("LIQUIDITÀ TOTALE", "0.00 EUR")
@@ -87,7 +98,7 @@ elif st.session_state.active_tab == "MOVIMENTI":
 
 elif st.session_state.active_tab == "IMPOSTAZIONI":
     st.subheader("Impostazioni")
-    with st.expander("ℹ️ Informazioni Legali e Privacy"):
+    with st.expander("ℹ️ Informazioni Legali, Termini e Privacy Policy"):
         show_legal_texts()
     if st.button("Logout"):
         st.session_state.logged_user = None
