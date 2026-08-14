@@ -1,57 +1,42 @@
 import streamlit as st
+import pandas as pd
 import datetime
+from datetime import date
+import plotly.express as px
 
-# --- CONFIGURAZIONE E STILE ---
+# 1. CONFIGURAZIONE PAGINA
 st.set_page_config(page_title="MY FINANCE PRO", page_icon="⚡", layout="wide")
 
-# --- INIZIALIZZAZIONE STATO ---
+st.markdown("""
+    <style>
+    .main { background-color: #0b0f19; color: #cbd5e1; }
+    .stButton>button { border-radius: 8px; background: linear-gradient(145deg, #0f172a, #1e293b); color: #f8fafc; border: 1px solid #334155; padding: 8px 16px; font-weight: 600; }
+    .stButton>button:hover { border-color: #22c55e; color: #22c55e; }
+    div[data-testid="stMetricValue"] { color: #22c55e; font-family: 'Urbanist', sans-serif; font-weight: 700; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. TESTI LEGALI (MODULARI E ESAUSTIVI)
+def render_privacy_policy():
+    st.markdown("""
+    **INFORMATIVA PRIVACY (GDPR)**
+    Il Titolare tratta i tuoi dati (Email, Username, dati finanziari inseriti) esclusivamente per fornire il servizio di gestione bilancio. I dati sono conservati localmente. Non cediamo dati a terzi. Hai diritto ad accesso, rettifica e cancellazione (Art. 15-22 GDPR).
+    """)
+
+def render_terms_conditions():
+    st.markdown("""
+    **TERMINI DI SERVIZIO**
+    Software fornito "as-is". Lo sviluppatore non fornisce consulenza finanziaria; l'utente è unico responsabile delle decisioni prese basandosi sui dati elaborati dal software. La proprietà intellettuale è riservata. L'uso illecito comporterà l'immediata sospensione dell'account.
+    """)
+
+# 3. STATO SESSIONE
 if 'users' not in st.session_state: st.session_state.users = []
 if 'logged_user' not in st.session_state: st.session_state.logged_user = None
+if 'accounts' not in st.session_state: st.session_state.accounts = []
+if 'movements' not in st.session_state: st.session_state.movements = []
+if 'settings' not in st.session_state: st.session_state.settings = {"lang": "IT", "currency": "EUR"}
 
-# --- TESTI LEGALI ESAUSTIVI (DA INSERIRE NEGLI EXPANDER) ---
-def privacy_text_completa():
-    st.markdown("""
-    **INFORMATIVA SULLA PRIVACY (AI SENSI DEL GDPR - REGOLAMENTO UE 2016/679)**
-
-    **1. Titolare del Trattamento**  
-    Il Titolare del trattamento dei dati è lo sviluppatore e gestore della piattaforma MY FINANCE PRO.
-
-    **2. Tipologia dei dati raccolti e finalità**  
-    I dati personali raccolti al momento della registrazione comprendono: Indirizzo Email e Username. Vengono inoltre trattati i dati finanziari inseriti volontariamente dall'utente (movimenti, conti, importi, categorie). Tali dati sono trattati esclusivamente per consentire l'erogazione del servizio di gestione del bilancio personale e l'accesso all'area riservata.
-
-    **3. Base giuridica del trattamento**  
-    Il trattamento si fonda sul consenso esplicito prestato dall'utente mediante spunta in fase di registrazione e sulla necessità di eseguire il servizio richiesto.
-
-    **4. Modalità di conservazione e Sicurezza**  
-    I dati inseriti sono memorizzati all'interno dei sistemi di database dell'applicazione. Vengono adottate misure tecniche e organizzative adeguate a prevenire accessi non autorizzati, divulgazione, modifica o distruzione non autorizzata dei dati. Nessun dato viene ceduto a terzi per finalità commerciali o di profilazione.
-
-    **5. Diritti dell'interessato**  
-    L'utente gode in qualsiasi momento dei diritti di cui agli artt. 15 e seguenti del GDPR (accesso, rettifica, cancellazione, limitazione, opposizione al trattamento), esercitabili inviando una comunicazione al gestore della piattaforma o eliminando direttamente il proprio account.
-    """)
-
-def terms_text_completi():
-    st.markdown("""
-    **TERMINI E CONDIZIONI DI UTILIZZO DEL SERVIZIO**
-
-    **1. Oggetto e Accettazione**  
-    I presenti Termini e Condizioni regolano l'accesso e l'utilizzo del software MY FINANCE PRO. Completando la registrazione, l'utente accetta integralmente e senza riserve le presenti condizioni.
-
-    **2. Natura del Software ed Esclusione di Responsabilità Finanziaria**  
-    MY FINANCE PRO è uno strumento informatico di supporto alla gestione e catalogazione delle finanze personali fornito "così com'è" (as-is).  
-    * **Il software NON fornisce consulenza finanziaria, fiscale, legale o di investimento.**  
-    * Lo sviluppatore declina ogni responsabilità per eventuali errori di calcolo, perdite economiche, errata interpretazione dei dati o decisioni finanziarie intraprese dall'utente basandosi sui report generati dall'applicazione.
-
-    **3. Responsabilità dell'Utente e Credenziali**  
-    L'utente è l'unico ed esclusivo responsabile della custodia e della segretezza delle proprie credenziali di accesso (Username e Password). Qualsiasi attività compiuta tramite l'account registrato si intenderà effettuata dall'utente stesso. L'utente si impegna a manlevare e tenere indenne il gestore da qualsiasi pretesa derivante da un uso improprio o illecito del servizio.
-
-    **4. Proprietà Intellettuale**  
-    Tutti i diritti di proprietà intellettuale, il codice sorgente, la grafica, i loghi e i contenuti di MY FINANCE PRO sono di esclusiva proprietà del creatore. È severamente vietata la copia, la decompilazione, la redistribuzione o lo sfruttamento commerciale non autorizzato.
-
-    **5. Modifiche e Sospensione del Servizio**  
-    Il gestore si riserva il diritto di modificare, sospendere o interrompere, in tutto o in parte, il servizio in qualsiasi momento, anche senza preavviso, per esigenze tecniche, di sicurezza o legali, senza che ciò faccia sorgere alcun diritto dell'utente a risarcimenti o indennizzi.
-    """)
-
-# --- SCHERMATA LOGIN / REGISTRAZIONE ---
+# 4. GESTIONE ACCESSO / REGISTRAZIONE
 if not st.session_state.logged_user:
     st.title("🔐 MY FINANCE PRO - Accesso")
     tab_login, tab_register = st.tabs(["Accedi", "Registrati"])
@@ -59,45 +44,67 @@ if not st.session_state.logged_user:
     with tab_login:
         l_user = st.text_input("Username o Email", key="log_user")
         l_pass = st.text_input("Password", type="password", key="log_pass")
-        if st.button("Accedi"):
-            st.session_state.logged_user = l_user
-            st.rerun()
+        if st.button("Login"):
+            user_found = next((u for u in st.session_state.users if u['user'] == l_user), None)
+            if user_found:
+                st.session_state.logged_user = l_user
+                st.rerun()
+            else: st.error("Credenziali non valide.")
                 
     with tab_register:
-        st.subheader("Crea il tuo Account")
-        r_email = st.text_input("Inserisci la tua Email")
-        r_user = st.text_input("Scegli uno Username")
-        r_pass = st.text_input("Scegli una Password", type="password")
+        r_email = st.text_input("Email", key="reg_email")
+        r_user = st.text_input("Username", key="reg_user")
+        r_pass = st.text_input("Password", type="password", key="reg_pass")
         
-        st.markdown("---")
+        with st.expander("📖 Leggi Privacy Policy"): render_privacy_policy()
+        with st.expander("📖 Leggi Termini e Condizioni"): render_terms_conditions()
         
-        # Testi nascosti dentro gli expander (l'utente li apre solo se vuole leggerli)
-        with st.expander("📖 Leggi la Privacy Policy Completa (GDPR)"):
-            privacy_text_completa()
-            
-        with st.expander("📖 Leggi i Termini e Condizioni di Servizio Completi"):
-            terms_text_completi()
-            
-        # Due flag obbligatori puliti
-        accetto_privacy = st.checkbox("Dichiaro di aver letto e accetto la Privacy Policy")
-        accetto_termini = st.checkbox("Dichiaro di aver letto e accetto i Termini e Condizioni di Servizio")
+        acc_privacy = st.checkbox("Accetto la Privacy Policy")
+        acc_terms = st.checkbox("Accetto i Termini e Condizioni")
         
         if st.button("Registrati"):
-            if not r_email or not r_user or not r_pass:
-                st.error("Tutti i campi (Email, Username, Password) sono obbligatori.")
-            elif not accetto_privacy or not accetto_termini:
-                st.error("Devi obbligatoriamente accettare sia la Privacy Policy che i Termini e Condizioni per registrarti.")
+            if not r_email or not r_user or not r_pass: st.error("Compila tutti i campi.")
+            elif not acc_privacy or not acc_terms: st.error("Devi accettare termini e privacy.")
             else:
-                st.session_state.users.append({"email": r_email, "username": r_user})
-                st.success("Registrazione completata con successo! Ora puoi effettuare il login.")
-
+                st.session_state.users.append({"email": r_email, "user": r_user, "pass": r_pass})
+                st.success("Registrato! Ora puoi fare il login.")
     st.stop()
 
-# --- AREA RISERVATA ---
-st.sidebar.title(f"Bentornato {st.session_state.logged_user}")
+# 5. APP CORE (DOPO IL LOGIN)
+st.sidebar.title(f"Benvenuto, {st.session_state.logged_user}")
+menu = st.sidebar.radio("Navigazione", ["DASHBOARD", "MOVIMENTI", "IMPOSTAZIONI"])
+
 if st.sidebar.button("Logout"):
     st.session_state.logged_user = None
     st.rerun()
 
-st.title("Dashboard")
-st.write("Area privata attiva.")
+if menu == "DASHBOARD":
+    st.header("📊 Dashboard")
+    # Qui inserisci i grafici e le metriche che avevamo previsto
+    st.metric("Saldo Totale", "€ 0,00")
+
+elif menu == "MOVIMENTI":
+    st.header("💳 Movimenti")
+    # Logica di inserimento movimenti
+    col1, col2 = st.columns(2)
+    with col1:
+        desc = st.text_input("Descrizione")
+        imp = st.number_input("Importo", step=0.01)
+    with col2:
+        tipo = st.selectbox("Tipo", ["Entrata", "Uscita"])
+        data = st.date_input("Data")
+    if st.button("Salva Movimento"):
+        st.session_state.movements.append({"desc": desc, "imp": imp, "tipo": tipo, "data": data})
+        st.success("Salvato!")
+
+elif menu == "IMPOSTAZIONI":
+    st.header("⚙️ Impostazioni")
+    with st.expander("⚖️ Note Legali"):
+        render_privacy_policy()
+        render_terms_conditions()
+    
+    # Impostazioni lingua/valuta
+    lang = st.selectbox("Lingua", ["Italiano", "Inglese"])
+    if st.button("Salva Preferenze"):
+        st.session_state.settings["lang"] = lang
+        st.success("Salvato.")
