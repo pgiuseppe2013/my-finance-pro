@@ -4,7 +4,7 @@ import datetime
 from datetime import date
 import plotly.express as px
 
-# 1. CONFIGURAZIONE PAGINA
+# --- 1. CONFIGURAZIONE PAGINA E STILE ---
 st.set_page_config(page_title="MY FINANCE PRO", page_icon="⚡", layout="wide")
 
 st.markdown("""
@@ -12,31 +12,37 @@ st.markdown("""
     .main { background-color: #0b0f19; color: #cbd5e1; }
     .stButton>button { border-radius: 8px; background: linear-gradient(145deg, #0f172a, #1e293b); color: #f8fafc; border: 1px solid #334155; padding: 8px 16px; font-weight: 600; }
     .stButton>button:hover { border-color: #22c55e; color: #22c55e; }
-    div[data-testid="stMetricValue"] { color: #22c55e; font-family: 'Urbanist', sans-serif; font-weight: 700; }
+    div[data-testid="stMetricValue"] { color: #22c55e; font-weight: 700; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. TESTI LEGALI (MODULARI E ESAUSTIVI)
+# --- 2. FUNZIONI TESTI LEGALI ESAUSTIVI ---
 def render_privacy_policy():
     st.markdown("""
-    **INFORMATIVA PRIVACY (GDPR)**
-    Il Titolare tratta i tuoi dati (Email, Username, dati finanziari inseriti) esclusivamente per fornire il servizio di gestione bilancio. I dati sono conservati localmente. Non cediamo dati a terzi. Hai diritto ad accesso, rettifica e cancellazione (Art. 15-22 GDPR).
+    ### 🛡️ PRIVACY POLICY (GDPR 2016/679)
+    **1. Titolare:** Gestore di MY FINANCE PRO.
+    **2. Dati Raccolti:** Email, Username e dati finanziari inseriti.
+    **3. Finalità:** Erogazione del servizio di gestione bilancio.
+    **4. Conservazione:** I dati sono memorizzati in locale. Non cediamo informazioni a terzi.
+    **5. Diritti:** Hai diritto di accesso, rettifica e cancellazione (Art. 15-22 GDPR).
     """)
 
 def render_terms_conditions():
     st.markdown("""
-    **TERMINI DI SERVIZIO**
-    Software fornito "as-is". Lo sviluppatore non fornisce consulenza finanziaria; l'utente è unico responsabile delle decisioni prese basandosi sui dati elaborati dal software. La proprietà intellettuale è riservata. L'uso illecito comporterà l'immediata sospensione dell'account.
+    ### 📜 TERMINI E CONDIZIONI
+    **1. Servizio:** Software "AS-IS". Non forniamo consulenza finanziaria.
+    **2. Responsabilità:** L'utente è l'unico responsabile dei dati inseriti e delle decisioni economiche intraprese.
+    **3. Proprietà:** Il codice e il design sono proprietà del creatore.
+    **4. Sospensione:** Ci riserviamo il diritto di sospendere il servizio per manutenzione o violazioni.
     """)
 
-# 3. STATO SESSIONE
+# --- 3. INIZIALIZZAZIONE STATO ---
 if 'users' not in st.session_state: st.session_state.users = []
 if 'logged_user' not in st.session_state: st.session_state.logged_user = None
-if 'accounts' not in st.session_state: st.session_state.accounts = []
 if 'movements' not in st.session_state: st.session_state.movements = []
 if 'settings' not in st.session_state: st.session_state.settings = {"lang": "IT", "currency": "EUR"}
 
-# 4. GESTIONE ACCESSO / REGISTRAZIONE
+# --- 4. GESTIONE ACCESSO E REGISTRAZIONE ---
 if not st.session_state.logged_user:
     st.title("🔐 MY FINANCE PRO - Accesso")
     tab_login, tab_register = st.tabs(["Accedi", "Registrati"])
@@ -44,7 +50,7 @@ if not st.session_state.logged_user:
     with tab_login:
         l_user = st.text_input("Username o Email", key="log_user")
         l_pass = st.text_input("Password", type="password", key="log_pass")
-        if st.button("Login"):
+        if st.button("Accedi"):
             user_found = next((u for u in st.session_state.users if u['user'] == l_user), None)
             if user_found:
                 st.session_state.logged_user = l_user
@@ -52,26 +58,27 @@ if not st.session_state.logged_user:
             else: st.error("Credenziali non valide.")
                 
     with tab_register:
-        r_email = st.text_input("Email", key="reg_email")
-        r_user = st.text_input("Username", key="reg_user")
-        r_pass = st.text_input("Password", type="password", key="reg_pass")
+        r_email = st.text_input("Email")
+        r_user = st.text_input("Scegli uno Username")
+        r_pass = st.text_input("Scegli una Password", type="password")
         
-        with st.expander("📖 Leggi Privacy Policy"): render_privacy_policy()
-        with st.expander("📖 Leggi Termini e Condizioni"): render_terms_conditions()
+        st.markdown("---")
+        with st.expander("📖 Leggi la Privacy Policy completa"): render_privacy_policy()
+        with st.expander("📖 Leggi i Termini e Condizioni completi"): render_terms_conditions()
         
         acc_privacy = st.checkbox("Accetto la Privacy Policy")
         acc_terms = st.checkbox("Accetto i Termini e Condizioni")
         
         if st.button("Registrati"):
             if not r_email or not r_user or not r_pass: st.error("Compila tutti i campi.")
-            elif not acc_privacy or not acc_terms: st.error("Devi accettare termini e privacy.")
+            elif not acc_privacy or not acc_terms: st.error("Devi accettare Privacy e Termini.")
             else:
-                st.session_state.users.append({"email": r_email, "user": r_user, "pass": r_pass})
-                st.success("Registrato! Ora puoi fare il login.")
+                st.session_state.users.append({"email": r_email, "user": r_user})
+                st.success("Account creato! Ora effettua il login.")
     st.stop()
 
-# 5. APP CORE (DOPO IL LOGIN)
-st.sidebar.title(f"Benvenuto, {st.session_state.logged_user}")
+# --- 5. CORE DELL'APP (DOPO IL LOGIN) ---
+st.sidebar.title(f"Bentornato {st.session_state.logged_user}")
 menu = st.sidebar.radio("Navigazione", ["DASHBOARD", "MOVIMENTI", "IMPOSTAZIONI"])
 
 if st.sidebar.button("Logout"):
@@ -79,13 +86,14 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 if menu == "DASHBOARD":
-    st.header("📊 Dashboard")
-    # Qui inserisci i grafici e le metriche che avevamo previsto
+    st.header("📊 Dashboard Finanziaria")
     st.metric("Saldo Totale", "€ 0,00")
+    if st.session_state.movements:
+        df = pd.DataFrame(st.session_state.movements)
+        st.bar_chart(df.set_index("data")["imp"])
 
 elif menu == "MOVIMENTI":
-    st.header("💳 Movimenti")
-    # Logica di inserimento movimenti
+    st.header("💳 Gestione Movimenti")
     col1, col2 = st.columns(2)
     with col1:
         desc = st.text_input("Descrizione")
@@ -93,18 +101,18 @@ elif menu == "MOVIMENTI":
     with col2:
         tipo = st.selectbox("Tipo", ["Entrata", "Uscita"])
         data = st.date_input("Data")
+    
     if st.button("Salva Movimento"):
         st.session_state.movements.append({"desc": desc, "imp": imp, "tipo": tipo, "data": data})
-        st.success("Salvato!")
+        st.success("Movimento salvato!")
 
 elif menu == "IMPOSTAZIONI":
     st.header("⚙️ Impostazioni")
-    with st.expander("⚖️ Note Legali"):
+    with st.expander("⚖️ Documentazione Legale"):
         render_privacy_policy()
         render_terms_conditions()
     
-    # Impostazioni lingua/valuta
     lang = st.selectbox("Lingua", ["Italiano", "Inglese"])
     if st.button("Salva Preferenze"):
         st.session_state.settings["lang"] = lang
-        st.success("Salvato.")
+        st.success("Preferenze aggiornate.")
